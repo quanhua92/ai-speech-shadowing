@@ -1,32 +1,31 @@
 # syntax=docker/dockerfile:1
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+# Multi-stage: the builder carries compilers (some deps, notably
+# praat-parselmouth, ship no linux/aarch64 wheel and must build from sdist on
+# Apple Silicon). The runtime stage copies only the finished venv + models.
 
-# uv: copy (not symlink) the venv, compile bytecode, pin the env path.
+# ── builder ──────────────────────────────────────────────────────────────────
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
+
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/app/.venv \
     UV_PYTHON_DOWNLOADS=never \
-    HF_HOME=/models \
-    PATH=/app/.venv/bin:$PATH
+    HF_HOME=/models
 
-# Runtime system libraries:
-#   espeak-ng   — kokoro's misaki English OOD fallback
-#   libsndfile1 — soundfile WAV decode (the wheel bundles it too, belt-and-braces)
-#   libgomp1    — torch's OpenMP runtime on linux
+# Build tools for any sdist (praat-parselmouth uses scikit-build + CMake/ninja).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        espeak-ng libsndfile1 libgomp1 ca-certificates \
+        build-essential cmake ninja-build ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 1) Dependencies first (cached layer, rebuilds only when the lock changes).
+# 1) Dependencies first (cached on the lock). praat-parselmouth compiles here.
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-# 2) Bake the models. If data/models/hub/ was pre-warmed locally (copied from
-#    ~/.cache/huggingface) the COPY already populated /models and we skip the
-#    download. Otherwise (e.g. a clean CI/server build) prewarm downloads them
-#    now. Placed before source so code edits don't re-trigger the model layer.
+# 2) Bake models. Copy pre-warmed cache from data/models/ if present (fast,
+#    offline); otherwise download. Placed before source so code edits don't
+#    re-trigger this layer.
 COPY data/models/ /models/
 COPY scripts/prewarm_models.py ./scripts/
 RUN ls -A /models/hub >/dev/null 2>&1 \
@@ -35,11 +34,30 @@ RUN ls -A /models/hub >/dev/null 2>&1 \
          && /app/.venv/bin/python scripts/prewarm_models.py ) \
     && rm -rf /root/.cache
 
-# 3) Application code + bundled default references (shipped in git).
+# 3) Application code + bundled default references; build & install the project.
 COPY README.md ./
 COPY src/ ./src/
 COPY data/references/ ./data/references/
 RUN uv sync --frozen --no-dev
+
+# ── runtime ──────────────────────────────────────────────────────────────────
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+ENV HF_HOME=/models \
+    PATH=/app/.venv/bin:$PATH
+
+# Runtime system libraries only (no compilers → smaller image):
+#   espeak-ng   — kokoro's misaki English OOD fallback
+#   libsndfile1 — soundfile WAV decode (wheel bundles it too)
+#   libgomp1    — torch's OpenMP runtime on linux
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        espeak-ng libsndfile1 libgomp1 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /app/.venv        /app/.venv
+COPY --from=builder /models           /models
+COPY --from=builder /app/data/references /app/data/references
 
 EXPOSE 8000
 ENTRYPOINT ["/app/.venv/bin/ai-speech-shadowing"]
