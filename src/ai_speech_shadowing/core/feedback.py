@@ -78,6 +78,7 @@ def build_report(
     *,
     weights: tuple[float, float, float] = DEFAULT_WEIGHTS,
     reference_text: str | None = None,
+    language: str = "en",
 ) -> FeedbackReport:
     """Combine the three pillar diffs into a FeedbackReport.
 
@@ -95,7 +96,9 @@ def build_report(
     w0, w1, w2 = weights
     composite = round(pron * w0 + into * w1 + flu * w2)
 
-    feedback = _generate_feedback(phoneme_diff, prosody_diff, fluency_diff, pron, into, flu)
+    feedback = _generate_feedback(
+        phoneme_diff, prosody_diff, fluency_diff, pron, into, flu, language=language
+    )
 
     words: tuple[WordDiff, ...] = ()
     if reference_text:
@@ -124,6 +127,66 @@ def build_report(
     )
 
 
+# Bilingual feedback message templates (en / vi). Placeholder fields are
+# filled by _fb() at format time.
+_FB: dict[str, dict[str, str]] = {
+    "pron_excellent": {
+        "en": "Pronunciation is excellent (PER {per:.3f}) - all sounds matched.",
+        "vi": "Phát âm xuất sắc (PER {per:.3f}) - tất cả âm đều khớp.",
+    },
+    "pron_sub": {
+        "en": "Pronunciation needs work (PER {per:.2f}): /{exp}/ -> /{act}/"
+        " - focus on tongue placement.",
+        "vi": "Phát âm cần cải thiện (PER {per:.2f}): /{exp}/ -> /{act}/ - chú ý vị trí lưỡi.",
+    },
+    "pron_general": {
+        "en": "Pronunciation needs work (PER {per:.2f}, {n} error(s))"
+        " - drill the difficult sounds.",
+        "vi": "Phát âm cần cải thiện (PER {per:.2f}, {n} lỗi) - tập luyện các âm khó.",
+    },
+    "into_narrow": {
+        "en": "Your pitch range is narrower than the reference"
+        " (ratio {ratio:.2f}) - exaggerate rising tones.",
+        "vi": "Dải cao độ hẹp hơn bản gốc (tỉ lệ {ratio:.2f}) - thử nhấn mạnh ngữ điệu lên.",
+    },
+    "into_excellent": {
+        "en": "Intonation is excellent (ratio {ratio:.2f}) - pitch contour matches.",
+        "vi": "Ngữ điệu xuất sắc (tỉ lệ {ratio:.2f}) - đường cao độ khớp bản gốc.",
+    },
+    "flu_weak": {
+        "en": "Fluency is the weak spot (DTW {dtw:.3f}) - shadow the native pacing.",
+        "vi": "Nhịp điệu là điểm yếu (DTW {dtw:.3f}) - nhái theo nhịp chuẩn.",
+    },
+    "flu_good": {
+        "en": "Fluency is good (DTW {dtw:.3f}) - rhythm closely matches.",
+        "vi": "Nhịp điệu tốt (DTW {dtw:.3f}) - nhịp khá khớp.",
+    },
+    "pauses": {
+        "en": "You paused {hyp}x vs the reference's {ref}x - steadier flow.",
+        "vi": "Bạn dừng {hyp} lần, bản gốc {ref} lần - nói trôi chảy hơn.",
+    },
+    "rate_slow": {
+        "en": "Speaking {pct:.0f}% slower ({hyp:.1f} vs {ref:.1f} syll/s).",
+        "vi": "Nói chậm hơn {pct:.0f}% ({hyp:.1f} vs {ref:.1f} âm/tiết/giây).",
+    },
+    "rate_fast": {
+        "en": "Speaking {pct:.0f}% faster ({hyp:.1f} vs {ref:.1f}) syll/s - slow down.",
+        "vi": "Nói nhanh hơn {pct:.0f}% ({hyp:.1f} vs {ref:.1f}) âm/tiết/giây - chậm lại.",
+    },
+    "great": {
+        "en": "Great job - your delivery closely matches the reference.",
+        "vi": "Rất tốt - phần đọc của bạn gần giống bản gốc.",
+    },
+}
+
+
+def _fb(key: str, lang: str = "en", **kw: object) -> str:
+    """Look up a bilingual feedback template and format it."""
+    entry = _FB.get(key, {"en": key})
+    template = entry.get(lang, entry["en"])
+    return template.format(**kw)
+
+
 def _generate_feedback(
     phoneme_diff: PhonemeDiff,
     prosody_diff: ProsodyDiff,
@@ -131,48 +194,76 @@ def _generate_feedback(
     pron_score: int,
     into_score: int,
     flu_score: int,
+    language: str = "en",
 ) -> list[str]:
-    """Produce targeted, deterministic suggestions for the weakest pillars."""
+    """Produce targeted, deterministic feedback in the requested language."""
     msgs: list[str] = []
+    lang = language if language in ("en", "vi") else "en"
 
+    # ---- Pronunciation ----
     if pron_score < GOOD_THRESHOLD:
         sub = next((op for op in phoneme_diff.operations if op.tag == "sub"), None)
         if sub is not None and sub.ref and sub.hyp:
             msgs.append(
-                f"Phoneme /{sub.ref}/ was substituted with /{sub.hyp}/ — focus on tongue placement."
+                _fb("pron_sub", lang, per=phoneme_diff.phoneme_error_rate, exp=sub.ref, act=sub.hyp)
             )
         else:
-            msgs.append(
-                "Several phonemes were mispronounced; isolate and drill the difficult sounds."
-            )
+            errs = phoneme_diff.substitutions + phoneme_diff.deletions + phoneme_diff.insertions
+            msgs.append(_fb("pron_general", lang, per=phoneme_diff.phoneme_error_rate, n=errs))
+    elif pron_score >= 90:
+        msgs.append(_fb("pron_excellent", lang, per=phoneme_diff.phoneme_error_rate))
 
+    # ---- Intonation ----
     if prosody_diff.monotone or (
         prosody_diff.pitch_range_ratio < 0.5 and into_score < GOOD_THRESHOLD
     ):
-        msgs.append(
-            "Your pitch range is narrower than the reference. Try exaggerating "
-            "rising tones on question endings."
-        )
+        msgs.append(_fb("into_narrow", lang, ratio=prosody_diff.pitch_range_ratio))
+    elif into_score >= 90:
+        msgs.append(_fb("into_excellent", lang, ratio=prosody_diff.pitch_range_ratio))
 
+    # ---- Fluency ----
     if flu_score < GOOD_THRESHOLD and fluency_diff.dtw.normalized_distance > 0.05:
-        msgs.append("Your rhythm diverges from the reference; shadow the native pacing.")
+        msgs.append(_fb("flu_weak", lang, dtw=fluency_diff.dtw.normalized_distance))
+    elif flu_score >= 80:
+        msgs.append(_fb("flu_good", lang, dtw=fluency_diff.dtw.normalized_distance))
 
+    # ---- Pauses ----
     if fluency_diff.hypothesis_pauses.count > fluency_diff.reference_pauses.count:
         msgs.append(
-            f"You paused {fluency_diff.hypothesis_pauses.count}x vs the "
-            f"reference's {fluency_diff.reference_pauses.count}x — aim for a "
-            "steadier flow."
+            _fb(
+                "pauses",
+                lang,
+                hyp=fluency_diff.hypothesis_pauses.count,
+                ref=fluency_diff.reference_pauses.count,
+            )
         )
 
+    # ---- Speaking rate ----
     if fluency_diff.syllable_rate_reference > 0:
         ratio = fluency_diff.syllable_rate_ratio
         if ratio < 0.7:
-            msgs.append("You're speaking slower than the reference; try to pick up the pace.")
+            msgs.append(
+                _fb(
+                    "rate_slow",
+                    lang,
+                    pct=(1 - ratio) * 100,
+                    hyp=fluency_diff.syllable_rate_hypothesis,
+                    ref=fluency_diff.syllable_rate_reference,
+                )
+            )
         elif ratio > 1.3:
-            msgs.append("You're speaking faster than the reference; slow down for clarity.")
+            msgs.append(
+                _fb(
+                    "rate_fast",
+                    lang,
+                    pct=(ratio - 1) * 100,
+                    hyp=fluency_diff.syllable_rate_hypothesis,
+                    ref=fluency_diff.syllable_rate_reference,
+                )
+            )
 
     if not msgs:
-        msgs.append("Great job — your delivery closely matches the reference.")
+        msgs.append(_fb("great", lang))
     return msgs
 
 
@@ -186,13 +277,10 @@ def evaluate(
     phoneme_extractor: object | None = None,
     weights: tuple[float, float, float] = DEFAULT_WEIGHTS,
     reference_text: str | None = None,
+    dtw_score_scale: float | None = None,
+    feedback_language: str = "en",
 ) -> FeedbackReport:
-    """Run the full evaluation pipeline and return a FeedbackReport.
-
-    If ``reference_text`` is supplied (the native sentence the user was aiming
-    at), the report carries a best-effort word-level diff in addition to the
-    exact phoneme-level one.
-    """
+    """Run the full evaluation pipeline and return a FeedbackReport."""
     from ai_speech_shadowing.core.fluency import compare_fluency
     from ai_speech_shadowing.core.phoneme import diff_phonemes, get_extractor
     from ai_speech_shadowing.core.prosody import compare_pitch, extract_pitch
@@ -203,13 +291,17 @@ def evaluate(
     phoneme_diff = diff_phonemes(ref_phonemes, hyp_phonemes)
 
     prosody_diff = compare_pitch(extract_pitch(reference_sample), extract_pitch(hypothesis_sample))
-    fluency_diff = compare_fluency(reference_sample, hypothesis_sample)
+    fluency_kwargs: dict[str, object] = {}
+    if dtw_score_scale is not None:
+        fluency_kwargs["dtw_score_scale"] = dtw_score_scale
+    fluency_diff = compare_fluency(reference_sample, hypothesis_sample, **fluency_kwargs)
     return build_report(
         phoneme_diff,
         prosody_diff,
         fluency_diff,
         weights=weights,
         reference_text=reference_text,
+        language=feedback_language,
     )
 
 

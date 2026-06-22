@@ -161,7 +161,7 @@ class TestFeedback:
     def test_substitution_message(self) -> None:
         diff = diff_phonemes(["h", "ə", "l", "oʊ"], ["h", "ə", "ɹ", "oʊ"])
         report = build_report(diff, _prosody(1.0), _fluency(1.0))
-        assert any("substituted" in m and "/l/" in m and "/ɹ/" in m for m in report.feedback)
+        assert any("/l/" in m and "/ɹ/" in m for m in report.feedback)
 
     def test_monotone_message(self) -> None:
         report = build_report(
@@ -177,7 +177,7 @@ class TestFeedback:
             _prosody(1.0),
             _fluency(score=0.3, norm=0.2),
         )
-        assert any("rhythm diverges" in m for m in report.feedback)
+        assert any("shadow" in m for m in report.feedback)
 
     def test_pause_message(self) -> None:
         report = build_report(

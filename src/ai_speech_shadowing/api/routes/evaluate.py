@@ -35,13 +35,29 @@ def _run_evaluation(
     reference_id: str | None,
     reference_text: str | None = None,
     attempt_bytes: bytes | None = None,
+    weights: tuple[float, float, float] | None = None,
+    dtw_score_scale: float | None = None,
+    feedback_language: str = "en",
 ) -> EvaluationResponse:
     """Preprocess both signals, evaluate, persist (report + attempt audio), respond."""
     state = get_state()
     extractor = state.phoneme_extractor()
     ref = preprocess(reference_audio)
     hyp = preprocess(user_audio)
-    report = evaluate_pipeline(ref, hyp, phoneme_extractor=extractor, reference_text=reference_text)
+    eval_kwargs: dict[str, object] = {}
+    if weights:
+        eval_kwargs["weights"] = weights
+    if dtw_score_scale is not None:
+        eval_kwargs["dtw_score_scale"] = dtw_score_scale
+    if feedback_language and feedback_language != "en":
+        eval_kwargs["feedback_language"] = feedback_language
+    report = evaluate_pipeline(
+        ref,
+        hyp,
+        phoneme_extractor=extractor,
+        reference_text=reference_text,
+        **eval_kwargs,
+    )
 
     path = save_report(report, history_dir=state.history_dir)
     eval_id = path.stem
@@ -89,6 +105,17 @@ def _stamp_reference_id(path, reference_id: str | None) -> None:
 def evaluate(
     audio: Annotated[UploadFile, File(description="User audio (WAV/WebM/MP3).")],
     reference_id: Annotated[str, Form(description="Reference slug to compare against.")],
+    weight_pronunciation: Annotated[
+        float, Form(ge=0, le=1, description="Pronunciation weight (0-1).")
+    ] = 0.4,
+    weight_intonation: Annotated[
+        float, Form(ge=0, le=1, description="Intonation weight (0-1).")
+    ] = 0.3,
+    weight_fluency: Annotated[float, Form(ge=0, le=1, description="Fluency weight (0-1).")] = 0.3,
+    dtw_scale: Annotated[
+        float, Form(ge=0.1, le=10, description="DTW score scale - higher = more lenient fluency.")
+    ] = 1.0,
+    feedback_language: Annotated[str, Form(description="Feedback language: 'en' or 'vi'.")] = "en",
 ) -> EvaluationResponse:
     """Evaluate user audio against a pre-generated reference."""
     state = get_state()
@@ -101,14 +128,22 @@ def evaluate(
         )
     reference_audio = AudioSample.from_wav(ref_file)
     user_audio, attempt_bytes = _decode_upload(audio)
-    # pull the reference's source text for word-level highlighting
     reference_text = str(state.reference_manager.read_metadata(reference_id).get("text", ""))
+
+    # normalise weights to sum 1
+    raw_w = (weight_pronunciation, weight_intonation, weight_fluency)
+    wsum = sum(raw_w) or 1.0
+    weights = tuple(w / wsum for w in raw_w)
+
     return _run_evaluation(
         reference_audio=reference_audio,
         user_audio=user_audio,
         reference_id=reference_id,
         reference_text=reference_text or None,
         attempt_bytes=attempt_bytes,
+        weights=weights,
+        dtw_score_scale=dtw_scale,
+        feedback_language=feedback_language,
     )
 
 

@@ -28,9 +28,11 @@ DEFAULT_TRIM_TOP_DB: int = 30
 DEFAULT_MIN_PAUSE_S: float = 0.25
 """A silence gap strictly inside the clip of at least this length (seconds) is
 flagged as an abnormal pause."""
-DTW_SCORE_SCALE: float = 0.5
-"""Per-frame DTW distance at which the provisional sub-score hits 0. Phase 5
-calibrates this against real speech pairs."""
+DTW_SCORE_SCALE: float = 1.0
+"""Per-frame DTW distance at which the fluency sub-score hits 0. Calibrated for
+human-vs-TTS comparisons (different speakers have inherently larger MFCC
+distances than identical clips). Identical → 1.0; ~0.4 for same-words
+different-speaker; >0.6 for very different content."""
 
 
 def _mono(sample: AudioSample) -> np.ndarray:
@@ -223,13 +225,18 @@ def compare_fluency(
     hop_length: int = DEFAULT_HOP_LENGTH,
     radius: int = DEFAULT_DTW_RADIUS,
     min_pause_s: float = DEFAULT_MIN_PAUSE_S,
+    dtw_score_scale: float = DTW_SCORE_SCALE,
 ) -> FluencyDiff:
-    """Full fluency comparison: MFCC → DTW + pauses + syllable rate."""
+    """Full fluency comparison: MFCC → DTW + pauses + syllable rate.
+
+    ``dtw_score_scale`` controls how lenient the fluency score is (higher =
+    more forgiving). Defaults to the module-level ``DTW_SCORE_SCALE``.
+    """
     ref_mfcc = extract_mfcc(reference_sample, n_mfcc=n_mfcc, hop_length=hop_length)
     hyp_mfcc = extract_mfcc(hypothesis_sample, n_mfcc=n_mfcc, hop_length=hop_length)
     dtw = dtw_distance(ref_mfcc, hyp_mfcc, radius=radius)
 
-    score = max(0.0, 1.0 - dtw.normalized_distance / DTW_SCORE_SCALE)
+    score = max(0.0, 1.0 - dtw.normalized_distance / dtw_score_scale)
 
     ref_rate = estimate_syllable_rate(reference_sample, hop_length=hop_length)
     hyp_rate = estimate_syllable_rate(hypothesis_sample, hop_length=hop_length)
