@@ -167,3 +167,18 @@ def kokoro_ref_wav(tmp_path_factory: pytest.TempPathFactory) -> Path:
         sf.write(str(out), audio, 24000)
         break  # short sentence -> single chunk
     return out
+
+
+@pytest.fixture(scope="session")
+def kokoro_alt_wav(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """A second, different Kokoro reference for non-trivial comparison tests."""
+    import soundfile as sf
+    from kokoro import KPipeline
+
+    pipeline = KPipeline(lang_code="a")
+    text = "Good morning, how are you today?"
+    out = tmp_path_factory.mktemp("kokoro") / "alt.wav"
+    for _gs, _ps, audio in pipeline(text, voice="af_heart"):
+        sf.write(str(out), audio, 24000)
+        break
+    return out

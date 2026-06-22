@@ -271,17 +271,18 @@ Because a user might speak slower or faster than the native reference without ne
 
 ---
 
-### Phase 5 — Feedback Engine & Scoring
+### Phase 5 — Feedback Engine & Scoring ✅
 
 > **Goal:** Unify all sub-scores into a coherent, actionable feedback report.
+> **Done** — see [`feedback-scoring.md`](feedback-scoring.md) for the full API reference.
 
-- [ ] Design `FeedbackReport` data model combining all three pillars
-- [ ] Implement weighted composite score (configurable weights)
-- [ ] Generate textual feedback with specific improvement suggestions
-- [ ] Color-coded severity levels (e.g., 🟢 Good / 🟡 Fair / 🔴 Needs Work)
-- [ ] Support JSON output for programmatic consumption
-- [ ] Support Markdown / terminal-pretty output for human consumption
-- [ ] Write integration tests: full pipeline from audio → report
+- [x] Design `FeedbackReport` data model combining all three pillars
+- [x] Implement weighted composite score (configurable weights)
+- [x] Generate textual feedback with specific improvement suggestions
+- [x] Color-coded severity levels (e.g., 🟢 Good / 🟡 Fair / 🔴 Needs Work)
+- [x] Support JSON output for programmatic consumption
+- [x] Support Markdown / terminal-pretty output for human consumption
+- [x] Write integration tests: full pipeline from audio → report
 
 **Example Output:**
 ```
