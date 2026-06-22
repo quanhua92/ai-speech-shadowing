@@ -56,6 +56,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY --from=builder /app/.venv        /app/.venv
+COPY --from=builder /app/src          /app/src
 COPY --from=builder /models           /models
 COPY --from=builder /app/data/references /app/data/references
 

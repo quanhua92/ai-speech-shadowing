@@ -2,7 +2,7 @@
 
 A local-first speech evaluation engine for language learning via the **shadowing technique**. Compare recorded user audio against native TTS reference clips and get multi-dimensional feedback on **pronunciation, prosody, and fluency** — entirely offline, with zero per-evaluation cost.
 
-> **Status:** Alpha — core engine, REST API, and interactive demo complete (Phases 0–8). Docker written but not yet verified. Phase 9 (optimization) and Phase 10 (full web UI) pending.
+> **Status:** Alpha — core engine, REST API, and interactive demo complete (Phases 0–8). Docker verified. Phase 9 (optimization) and Phase 10 (full web UI) pending.
 
 For the full architecture, roadmap, and API specification, see [`docs/README.md`](docs/README.md).
 
