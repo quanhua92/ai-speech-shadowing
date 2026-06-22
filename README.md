@@ -8,9 +8,9 @@ For the full architecture, roadmap, and API specification, see [`docs/README.md`
 
 ## Demo
 
-[![AI Speech Shadowing Demo](https://img.youtube.com/vi/vJmjhuJpdVg/0.jpg)](https://youtu.be/vJmjhuJpdVg)
+[![AI Speech Shadowing Demo](https://img.youtube.com/vi/ikQmdSpkKCg/0.jpg)](https://youtu.be/ikQmdSpkKCg)
 
-[**▶ Watch the full walkthrough on YouTube**](https://youtu.be/vJmjhuJpdVg) — mic recording, reference generation, and multi-dimensional feedback (pronunciation, intonation, fluency).
+[**▶ Watch the full walkthrough on YouTube**](https://youtu.be/ikQmdSpkKCg) — mic recording, reference generation, and multi-dimensional feedback (pronunciation, intonation, fluency).
 
 ## Quick start
 
