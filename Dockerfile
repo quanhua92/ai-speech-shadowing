@@ -38,6 +38,7 @@ RUN ls -A /models/hub >/dev/null 2>&1 \
 COPY README.md ./
 COPY src/ ./src/
 COPY data/references/ ./data/references/
+COPY data/default.txt ./data/default.txt
 RUN uv sync --frozen --no-dev
 
 # ── runtime ──────────────────────────────────────────────────────────────────

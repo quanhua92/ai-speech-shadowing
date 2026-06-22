@@ -5,8 +5,8 @@ can run during ``docker build`` right after dependencies are installed —
 *before* the application source is copied. That keeps this layer cached on the
 dependency lock, so editing source code doesn't re-download ~1.5 GB of models.
 
-Idempotent: if HF_HOME is already populated (e.g. cache-mount hit), it's a fast
-no-op.
+Also downloads all US + UK English Kokoro voices so the pregenerate step can
+run without network. Idempotent.
 """
 
 from __future__ import annotations
@@ -14,6 +14,10 @@ from __future__ import annotations
 import sys
 
 WAV2VEC2 = "facebook/wav2vec2-lv-60-espeak-cv-ft"
+
+# US + UK English voices to pre-download (each ~3 MB, one-time)
+US_VOICES = ["af_heart", "af_bella", "af_nicole", "af_sky", "am_adam", "am_michael"]
+UK_VOICES = ["bf_emma", "bf_isabella", "bf_alice", "bm_george", "bm_lewis"]
 
 
 def main() -> int:
@@ -26,8 +30,15 @@ def main() -> int:
     Wav2Vec2ForCTC.from_pretrained(WAV2VEC2)
     hf_hub_download(WAV2VEC2, "vocab.json")
 
-    print(">>> prewarming Kokoro TTS model + af_heart voice (~330 MB)...", flush=True)
-    list(KPipeline(lang_code="a")("hello", voice="af_heart"))
+    print(">>> prewarming Kokoro TTS model + all US/UK English voices...", flush=True)
+    p = KPipeline(lang_code="a")
+    for v in US_VOICES:
+        list(p("hello", voice=v))
+        print(f"    downloaded voice: {v}", flush=True)
+    p = KPipeline(lang_code="b")
+    for v in UK_VOICES:
+        list(p("hello", voice=v))
+        print(f"    downloaded voice: {v}", flush=True)
 
     print(">>> prewarm complete.", flush=True)
     return 0

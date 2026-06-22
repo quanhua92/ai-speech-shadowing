@@ -77,7 +77,7 @@
           <option value="ja">Japanese</option>
           <option value="zh">Chinese</option>
         </select>
-        <select id="voice-name" onchange="saveSettings()" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs"></select>
+        <select id="voice-name" onchange="saveSettings();playSelectedReference()" class="bg-panel2 border border-border text-text rounded-md px-2 py-1.5 text-xs"></select>
       </div>
       <div id="ref-text-display" class="text-sm text-text mt-2 mb-1 italic"></div>
       <audio id="ref-audio" controls class="w-full mt-2"></audio>
