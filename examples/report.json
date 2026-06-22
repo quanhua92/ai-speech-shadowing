@@ -1,0 +1,165 @@
+{
+  "composite": {
+    "score": 87,
+    "grade": "good"
+  },
+  "scores": {
+    "pronunciation": {
+      "score": 90,
+      "grade": "good"
+    },
+    "intonation": {
+      "score": 100,
+      "grade": "good",
+      "pitch_range_ratio": 0.998,
+      "monotone": false
+    },
+    "fluency": {
+      "score": 69,
+      "grade": "fair",
+      "dtw_normalized_distance": 0.1568,
+      "syllable_rate_reference": 1.978,
+      "syllable_rate_hypothesis": 1.582,
+      "pause_count_reference": 0,
+      "pause_count_hypothesis": 0
+    }
+  },
+  "phoneme_error_rate": 0.0968,
+  "weights": [
+    0.4,
+    0.3,
+    0.3
+  ],
+  "phoneme_diff": [
+    {
+      "type": "match",
+      "phoneme": "ð"
+    },
+    {
+      "type": "match",
+      "phoneme": "ə"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "w"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "b"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɹ"
+    },
+    {
+      "type": "match",
+      "phoneme": "aʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "n"
+    },
+    {
+      "type": "match",
+      "phoneme": "f"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɑː"
+    },
+    {
+      "type": "match",
+      "phoneme": "k"
+    },
+    {
+      "type": "match",
+      "phoneme": "s"
+    },
+    {
+      "type": "match",
+      "phoneme": "dʒ"
+    },
+    {
+      "type": "match",
+      "phoneme": "ʌ"
+    },
+    {
+      "type": "match",
+      "phoneme": "m"
+    },
+    {
+      "type": "match",
+      "phoneme": "p"
+    },
+    {
+      "type": "sub",
+      "expected": "s",
+      "actual": "t"
+    },
+    {
+      "type": "match",
+      "phoneme": "oʊ"
+    },
+    {
+      "type": "match",
+      "phoneme": "v"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɚ"
+    },
+    {
+      "type": "sub",
+      "expected": "ð",
+      "actual": "ɹ"
+    },
+    {
+      "type": "sub",
+      "expected": "ə",
+      "actual": "ɐ"
+    },
+    {
+      "type": "match",
+      "phoneme": "l"
+    },
+    {
+      "type": "match",
+      "phoneme": "eɪ"
+    },
+    {
+      "type": "match",
+      "phoneme": "z"
+    },
+    {
+      "type": "match",
+      "phoneme": "i"
+    },
+    {
+      "type": "match",
+      "phoneme": "d"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɑː"
+    },
+    {
+      "type": "match",
+      "phoneme": "ɡ"
+    }
+  ],
+  "feedback": [
+    "Your rhythm diverges from the reference; shadow the native pacing."
+  ]
+}

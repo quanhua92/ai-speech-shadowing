@@ -1,0 +1,10 @@
+AI Speech Shadowing — Report
+────────────────────────────────────────────────────
+Pronunciation (PER):    90  🟢 good
+Intonation (Pitch):    100  🟢 good
+Fluency (DTW):          69  🟡 fair
+────────────────────────────────────────────────────
+Composite Score:       87/100  🟢 good
+────────────────────────────────────────────────────
+Feedback:
+  • Your rhythm diverges from the reference; shadow the native pacing.
