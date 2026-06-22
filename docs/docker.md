@@ -55,12 +55,15 @@ back to downloading during `docker build` via `scripts/prewarm_models.py`.
 
 ## Platform notes
 
-- **Apple Silicon:** Docker Desktop builds native `linux/arm64` images (fast).
+Both arches are verified working. The Dockerfile pins no `platform` — it builds
+natively for whatever the host is.
+
+- **Apple Silicon (arm64):** praat-parselmouth has no aarch64 wheel, so the
+  builder stage compiles it from source (`build-essential` + `cmeta` + `ninja`).
   MPS GPU acceleration isn't available inside the container — inference runs on
   CPU, which is fine for a demo.
-- **Linux x86_64 server:** the same `Dockerfile` / `compose` builds `linux/amd64`
-  natively (the lockfile pins both arches' torch wheels). This is the primary
-  deployment target.
+- **Linux x86_64 server (amd64):** praat-parselmouth uses the prebuilt
+  manylinux wheel (no compilation). This is the primary deployment target.
 
 ## Useful commands
 
