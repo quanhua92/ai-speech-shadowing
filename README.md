@@ -5,6 +5,7 @@ A local-first speech evaluation engine for language learning via the **shadowing
 > **Status:** Alpha — core engine, REST API, interactive demo, and Docker all complete (Phases 0–8). Phase 9 (optimization) and Phase 10 (full web UI) pending.
 
 For the full architecture, roadmap, and API specification, see [`docs/README.md`](docs/README.md).
+For a head-to-head scoring comparison against ELSA Speak, see [`docs/elsa-comparison.md`](docs/elsa-comparison.md).
 
 ## Demo
 
