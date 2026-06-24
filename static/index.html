@@ -287,6 +287,7 @@ async function createReference() {
     const ref = await jpost(`${API}/references`, JSON.stringify({ text, language: lang, speaker: voice }));
     await loadReferences();
     document.getElementById("ref-select").value = ref.id;
+    document.getElementById("ref-text-display").textContent = ref.text || text;
     setAudio("ref-audio", `${API}/references/${ref.id}/audio`, "reference(gen)");
     refreshHealth();
   } catch (e) { alert("Failed: " + e.message); }

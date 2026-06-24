@@ -297,6 +297,7 @@ def evaluate(
     reference_phonemes: Sequence[str] | None = None,
     dtw_score_scale: float | None = None,
     feedback_language: str = "en",
+    reference_language: str | None = None,
 ) -> FeedbackReport:
     """Run the full evaluation pipeline and return a FeedbackReport.
 
@@ -315,6 +316,10 @@ def evaluate(
 
     The hypothesis (user) side always goes through the acoustic recognizer —
     that's the only way to hear what the user physically said.
+
+    Args:
+        reference_language: ISO code of the reference (e.g. ``"en-us"``). Used to
+            filter the hypothesis output to that language's phoneme inventory.
     """
     from ai_speech_shadowing.core.fluency import compare_fluency
     from ai_speech_shadowing.core.phoneme import diff_phonemes, get_extractor
@@ -327,9 +332,9 @@ def evaluate(
         ref_source = "kokoro-g2p"
     else:
         # Acoustic fallback (no transcript / uploaded clip path).
-        ref_phonemes = extractor.extract(reference_sample).phonemes
+        ref_phonemes = extractor.extract(reference_sample, language=reference_language).phonemes
         ref_source = "wav2vec2-acoustic"
-    hyp_phonemes = extractor.extract(hypothesis_sample).phonemes
+    hyp_phonemes = extractor.extract(hypothesis_sample, language=reference_language).phonemes
     phoneme_diff = diff_phonemes(ref_phonemes, hyp_phonemes)
 
     prosody_diff = compare_pitch(extract_pitch(reference_sample), extract_pitch(hypothesis_sample))

@@ -7,14 +7,18 @@ extraction test is marked ``slow`` — it downloads ~1.2GB and only runs with
 
 from __future__ import annotations
 
+# IPA characters in this module are intentional.
+# ruff: noqa: RUF001
 from pathlib import Path
 
 import pytest
 
 from ai_speech_shadowing.core.audio import AudioSample
 from ai_speech_shadowing.core.phoneme import (
+    ENGLISH_PHONEMES,
     PhonemeDiff,
     PhonemeExtractor,
+    _normalize_to_language,
     diff_phonemes,
     phoneme_error_rate,
 )
@@ -117,6 +121,40 @@ class TestEdgeCases:
         # we just assert the diff path handles an empty hypothesis cleanly.
         d = diff_phonemes(["a", "b"], [])
         assert d.phoneme_error_rate == 1.0
+
+
+# --------------------------------------------------------------------------- #
+# English-inventory filtering (no model)
+# --------------------------------------------------------------------------- #
+class TestNormalizeToLanguage:
+    def test_drops_tonal_and_non_english_tokens(self) -> None:
+        # Recognizer garbage from eval_cde21c1f: Mandarin tones + stray chars.
+        raw = ("ð", "ə", "ɕ", "ɑ5", "ai5", "ei5", "u5", "iɜ", "k", "ɔː", "uː")
+        assert _normalize_to_language(raw, "en-us") == ("ð", "ə", "k", "ɔ", "u")
+
+    def test_strips_length_and_stress_marks(self) -> None:
+        assert _normalize_to_language(("ɜː", "ˈæ", "ˌt"), "en") == ("ɜ", "æ", "t")
+
+    def test_non_english_language_passes_through(self) -> None:
+        raw = ("ɕ", "iɛ5", "a")
+        # Spanish/French/etc. are not filtered — the model covers them natively.
+        assert _normalize_to_language(raw, "es") == raw
+        assert _normalize_to_language(raw, None) == raw
+
+    def test_keeps_english_diphthongs(self) -> None:
+        assert _normalize_to_language(("eɪ", "oʊ", "aɪ", "θ"), "en-gb") == (
+            "eɪ",
+            "oʊ",
+            "aɪ",
+            "θ",
+        )
+
+    def test_reference_tokens_all_pass_filter(self) -> None:
+        # The Kokoro G2P output for an English reference must survive filtering.
+        ref_tokens = ["h", "əl", "oʊ", "w", "ɜ", "ɹ", "l", "d"]
+        assert list(_normalize_to_language(tuple(ref_tokens), "en-us")) == ref_tokens
+        # sanity: the inventory is non-empty and covers the basics
+        assert {"θ", "ð", "eɪ", "ɹ"} <= ENGLISH_PHONEMES
 
 
 # --------------------------------------------------------------------------- #

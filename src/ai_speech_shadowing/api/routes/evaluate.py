@@ -39,6 +39,7 @@ def _run_evaluation(
     weights: tuple[float, float, float] | None = None,
     dtw_score_scale: float | None = None,
     feedback_language: str = "en",
+    reference_language: str | None = None,
 ) -> EvaluationResponse:
     """Preprocess both signals, evaluate, persist (report + attempt audio), respond."""
     state = get_state()
@@ -54,6 +55,8 @@ def _run_evaluation(
         eval_kwargs["feedback_language"] = feedback_language
     if reference_phonemes is not None:
         eval_kwargs["reference_phonemes"] = reference_phonemes
+    if reference_language:
+        eval_kwargs["reference_language"] = reference_language
     report = evaluate_pipeline(
         ref,
         hyp,
@@ -152,6 +155,9 @@ def evaluate(
     reference_audio = AudioSample.from_wav(ref_file)
     user_audio, attempt_bytes = _decode_upload(audio)
     reference_text = str(state.reference_manager.read_metadata(reference_id).get("text", ""))
+    reference_language = (
+        str(state.reference_manager.read_metadata(reference_id).get("language", "")) or None
+    )
     reference_phonemes = _read_reference_phonemes(state.reference_manager, reference_id)
 
     # normalise weights to sum 1
@@ -170,6 +176,7 @@ def evaluate(
         reference_id=reference_id,
         reference_text=reference_text or None,
         reference_phonemes=reference_phonemes,
+        reference_language=reference_language,
         attempt_bytes=attempt_bytes,
         weights=weights,
         dtw_score_scale=dtw_scale,
@@ -206,5 +213,6 @@ def evaluate_quick(
         reference_id=slug,
         reference_text=text,
         reference_phonemes=reference_phonemes,
+        reference_language=language,
         attempt_bytes=attempt_bytes,
     )

@@ -13,6 +13,8 @@ dependency on espeak linkage for the extraction path.
 
 from __future__ import annotations
 
+# IPA characters in this module are intentional.
+# ruff: noqa: RUF001, RUF003
 import difflib
 import json
 from dataclasses import dataclass
@@ -32,6 +34,94 @@ espeak IPA phoneme vocabulary (392 tokens)."""
 
 MODEL_SAMPLE_RATE: int = TARGET_SAMPLE_RATE  # 16000 — the model's only contract
 BLANK_TOKEN = "<pad>"  # CTC blank token (vocab id 0)
+
+# English IPA inventory (espeak tokens). The multilingual recognizer can emit
+# tokens from any of its 60 training languages (Mandarin tones like "ɑ5", "ai5";
+# non-English consonants like "ɕ"); on an English reference these are noise that
+# inflate PER and confuse "Your phonemes". This allowlist filters them out.
+# Length ("ː") and stress ("ˈˌ") marks are stripped before lookup to match how
+# the G2P reference is normalized (see core.g2p.norm_misaki).
+ENGLISH_PHONEMES: frozenset[str] = frozenset(
+    {
+        # consonants
+        "p",
+        "b",
+        "t",
+        "d",
+        "k",
+        "g",
+        "f",
+        "v",
+        "θ",
+        "ð",
+        "s",
+        "z",
+        "ʃ",
+        "ʒ",
+        "h",
+        "m",
+        "n",
+        "ŋ",
+        "l",
+        "ɹ",
+        "j",
+        "w",
+        "ɾ",
+        "ʔ",
+        "tʃ",
+        "dʒ",
+        "ts",
+        "dz",
+        # monophthongs
+        "i",
+        "ɪ",
+        "ɛ",
+        "æ",
+        "ʌ",
+        "ɔ",
+        "ʊ",
+        "u",
+        "ə",
+        "ɜ",
+        "ɑ",
+        "ɒ",
+        "ɐ",
+        "ɚ",
+        "ɝ",
+        # diphthongs
+        "eɪ",
+        "oʊ",
+        "aɪ",
+        "aʊ",
+        "ɔɪ",
+        "ɪə",
+        "ɛə",
+        "ʊə",
+        # syllabic / common clusters emitted by English G2P
+        "əl",
+        "ən",
+        "əm",
+    }
+)
+
+
+def _normalize_to_language(phonemes: tuple[str, ...], language: str | None) -> tuple[str, ...]:
+    """Filter recognizer output to the reference language's inventory.
+
+    Currently only English is filtered (the dominant case): tonal/digit-bearing
+    tokens are dropped, length/stress marks are stripped, and anything outside
+    :data:`ENGLISH_PHONEMES` is removed. Other languages pass through unchanged.
+    """
+    if not language or not language.lower().startswith("en"):
+        return phonemes
+    out: list[str] = []
+    for tok in phonemes:
+        if any(c.isdigit() for c in tok):  # tone markers — never English
+            continue
+        norm = tok.replace("ː", "").replace("ˈ", "").replace("ˌ", "")
+        if norm in ENGLISH_PHONEMES:
+            out.append(norm)
+    return tuple(out)
 
 
 # --------------------------------------------------------------------------- #
@@ -192,8 +282,13 @@ class PhonemeExtractor:
         self._id2token: dict[int, str] = {int(idx): tok for tok, idx in vocab.items()}
         self._blank_id: int = int(vocab.get(BLANK_TOKEN, 0))
 
-    def extract(self, sample: AudioSample) -> PhonemeResult:
+    def extract(self, sample: AudioSample, *, language: str | None = None) -> PhonemeResult:
         """Decode a canonical AudioSample (16 kHz) into a phoneme sequence.
+
+        Args:
+            language: Reference language code (e.g. ``"en-us"``). When English,
+                the output is filtered to the English IPA inventory so the
+                multilingual model's non-English tokens don't leak through.
 
         Raises:
             ValueError: If the sample is not at ``MODEL_SAMPLE_RATE`` (16 kHz).
@@ -215,6 +310,7 @@ class PhonemeExtractor:
             logits = self._model(input_values).logits
         predicted_ids = torch.argmax(logits, dim=-1)[0].tolist()
         phonemes = self._ctc_collapse(predicted_ids)
+        phonemes = _normalize_to_language(phonemes, language)
         return PhonemeResult(phonemes=phonemes, raw_text=" ".join(phonemes))
 
     def _ctc_collapse(self, ids: Sequence[int]) -> tuple[str, ...]:

@@ -270,7 +270,7 @@ class _FakeExtractor:
         self._result = PhonemeResult(phonemes=phonemes, raw_text=" ".join(phonemes))
         self.calls: list[AudioSample] = []
 
-    def extract(self, sample: AudioSample):  # type: ignore[no-untyped-def]
+    def extract(self, sample: AudioSample, *, language: str | None = None):  # type: ignore[no-untyped-def]
         self.calls.append(sample)
         return self._result
 
