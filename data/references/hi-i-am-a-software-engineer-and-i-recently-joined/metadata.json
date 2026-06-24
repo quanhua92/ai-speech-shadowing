@@ -2,7 +2,7 @@
   "text": "Hi, I am a software engineer and I recently joined the team.",
   "language": "en-us",
   "default_speaker": "af_heart",
-  "updated_at": "2026-06-22T19:14:40+00:00",
+  "updated_at": "2026-06-24T08:01:34+00:00",
   "audio": {
     "kokoro-en-us-af_heart": {
       "file": "audio/kokoro-en-us-af_heart/ref.wav",
@@ -59,5 +59,49 @@
       "sample_rate": 24000,
       "engine": "kokoro"
     }
+  },
+  "phonemes": {
+    "tokens": [
+      "h",
+      "aɪ",
+      "aɪ",
+      "ɐ",
+      "m",
+      "ɐ",
+      "s",
+      "ɔ",
+      "f",
+      "t",
+      "w",
+      "ɛɹ",
+      "ɛ",
+      "n",
+      "dʒ",
+      "ə",
+      "n",
+      "ɪɹ",
+      "æ",
+      "n",
+      "d",
+      "aɪ",
+      "ɹ",
+      "i",
+      "s",
+      "n",
+      "t",
+      "l",
+      "i",
+      "dʒ",
+      "aɪ",
+      "n",
+      "d",
+      "ð",
+      "ə",
+      "t",
+      "i",
+      "m"
+    ],
+    "source": "kokoro-g2p",
+    "notation": "espeak-wav2vec2"
   }
 }

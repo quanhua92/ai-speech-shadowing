@@ -219,6 +219,59 @@ class TestMetadataResilience:
         assert not (manager.config.base_dir / "hi" / "metadata.json.tmp").exists()
 
 
+class TestSetPhonemes:
+    """Tests for the force-overwrite path used by the backfill CLI."""
+
+    def test_set_phonemes_writes_block(self, manager: ReferenceManager) -> None:
+        manager.write_metadata("hi", "Hello", "a", "af_heart")
+        manager.set_phonemes("hi", ["h", "ə", "l", "oʊ"])
+        meta = manager.read_metadata("hi")
+        assert meta["phonemes"]["tokens"] == ["h", "ə", "l", "oʊ"]
+        assert meta["phonemes"]["source"] == "kokoro-g2p"
+        assert meta["phonemes"]["notation"] == "espeak-wav2vec2"
+
+    def test_set_phonemes_overwrites_existing(self, manager: ReferenceManager) -> None:
+        # First call via write_metadata establishes the field with setdefault.
+        manager.write_metadata("hi", "Hello", "a", "af_heart", phonemes=["old", "toks"])
+        # set_phonemes must overwrite unconditionally (no setdefault).
+        manager.set_phonemes("hi", ["h", "ə", "l", "oʊ"])
+        meta = manager.read_metadata("hi")
+        assert meta["phonemes"]["tokens"] == ["h", "ə", "l", "oʊ"]
+
+    def test_set_phonemes_preserves_other_fields(self, manager: ReferenceManager) -> None:
+        manager.write_metadata("hi", "Hello", "a", "af_heart", phonemes=["old"])
+        manager.set_phonemes("hi", ["h", "ə", "l", "oʊ"])
+        meta = manager.read_metadata("hi")
+        # text + audio entries are preserved across the forced phoneme update.
+        assert meta["text"] == "Hello"
+        assert "kokoro-en-us-af_heart" in meta["audio"]
+
+    def test_set_phonemes_raises_keyerror_for_missing_slug(self, manager: ReferenceManager) -> None:
+        with pytest.raises(KeyError, match=r"no metadata\.json"):
+            manager.set_phonemes("never-existed", ["a"])
+
+    def test_set_phonemes_raises_keyerror_for_corrupt_metadata(
+        self, manager: ReferenceManager
+    ) -> None:
+        d = manager.config.base_dir / "corrupt"
+        d.mkdir(parents=True)
+        (d / "metadata.json").write_text("{not json")
+        with pytest.raises(KeyError, match=r"corrupt metadata\.json"):
+            manager.set_phonemes("corrupt", ["a"])
+
+    def test_set_phonemes_custom_source(self, manager: ReferenceManager) -> None:
+        manager.write_metadata("hi", "Hello", "a", "af_heart")
+        manager.set_phonemes("hi", ["h", "ə"], source="transcript-g2p")
+        meta = manager.read_metadata("hi")
+        assert meta["phonemes"]["source"] == "transcript-g2p"
+
+    def test_set_phonemes_is_atomic(self, manager: ReferenceManager) -> None:
+        manager.write_metadata("hi", "Hello", "a", "af_heart")
+        manager.set_phonemes("hi", ["h", "ə", "l", "oʊ"])
+        # No stale .tmp file left behind.
+        assert not (manager.config.base_dir / "hi" / "metadata.json.tmp").exists()
+
+
 # --------------------------------------------------------------------------- #
 # parse_sentence_list (pure)
 # --------------------------------------------------------------------------- #

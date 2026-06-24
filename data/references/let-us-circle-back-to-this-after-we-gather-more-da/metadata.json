@@ -2,7 +2,7 @@
   "text": "Let us circle back to this after we gather more data.",
   "language": "en-us",
   "default_speaker": "af_heart",
-  "updated_at": "2026-06-22T19:15:13+00:00",
+  "updated_at": "2026-06-24T08:01:38+00:00",
   "audio": {
     "kokoro-en-us-af_heart": {
       "file": "audio/kokoro-en-us-af_heart/ref.wav",
@@ -59,5 +59,47 @@
       "sample_rate": 24000,
       "engine": "kokoro"
     }
+  },
+  "phonemes": {
+    "tokens": [
+      "l",
+      "ɛ",
+      "t",
+      "ʌ",
+      "s",
+      "s",
+      "ɜ",
+      "ɹ",
+      "k",
+      "l",
+      "b",
+      "æ",
+      "k",
+      "t",
+      "ə",
+      "ð",
+      "ɪ",
+      "s",
+      "æ",
+      "f",
+      "t",
+      "ə",
+      "ɹ",
+      "w",
+      "i",
+      "ɡ",
+      "æ",
+      "ð",
+      "ə",
+      "ɹ",
+      "m",
+      "ɔ",
+      "ɹ",
+      "d",
+      "eɪ",
+      "ə"
+    ],
+    "source": "kokoro-g2p",
+    "notation": "espeak-wav2vec2"
   }
 }

@@ -84,8 +84,31 @@ def misaki_to_espeak_tokens(phonemes: str) -> tuple[str, ...]:
     Use this to convert Kokoro's per-chunk G2P output (or any other misaki
     output) into a tuple of espeak tokens compatible with the Wav2Vec2 decode
     path. Drops stress marks, length marks, and unrecognized characters.
+
+    Note: the input must be a **phoneme** string (already G2P'd), not the raw
+    reference text. For the text → tokens path use :func:`text_to_espeak_tokens`.
     """
     return tuple(_tokenize(norm_misaki(phonemes), _get_espeak_tokens()))
+
+
+def text_to_espeak_tokens(text: str) -> tuple[str, ...]:
+    """Run misaki G2P on ``text`` and return the normalized espeak token sequence.
+
+    End-to-end text → phonemes path: G2P the text, drop non-alphabetic tokens
+    (punctuation), normalize each word's phonemes onto the espeak inventory,
+    and concatenate into one flat tuple. Used by the ``backfill-phonemes`` CLI
+    to populate references whose phonemes weren't captured at synthesis time.
+    """
+    import misaki.en as en
+
+    g2p = en.G2P()
+    _full, mtokens = g2p(text)
+    tokens = _get_espeak_tokens()
+    out: list[str] = []
+    for mt in mtokens:
+        if mt.phonemes and any(c.isalpha() for c in mt.text):
+            out.extend(_tokenize(norm_misaki(mt.phonemes), tokens))
+    return tuple(out)
 
 
 def g2p_words(text: str) -> list[tuple[str, list[str]]]:

@@ -386,6 +386,83 @@ def generate_reference_cmd(
             typer.echo(f"  {p}")
 
 
+@app.command("backfill-phonemes")
+def backfill_phonemes_cmd(
+    output_dir: Annotated[
+        Path, typer.Option("--output-dir", "-o", help="References base directory.")
+    ] = Path("data/references"),
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force", help="Recompute phonemes even for references that already have them."
+        ),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Show what would change without writing any files."),
+    ] = False,
+) -> None:
+    """Populate metadata.json[\"phonemes\"] for references that predate capture-at-gen.
+
+    For every reference under ``--output-dir`` with a stored ``text`` field, run
+    misaki G2P on the text and persist the normalized espeak tokens to the
+    ``phonemes`` block — the same field that :meth:`ReferenceManager.generate`
+    populates at synthesis time. References that already have the block are
+    skipped unless ``--force`` is given.
+
+    Idempotent: safe to re-run. Use this once after upgrading to the
+    capture-at-synthesis change to migrate existing references without
+    re-synthesizing their audio.
+    """
+    from ai_speech_shadowing.core.g2p import text_to_espeak_tokens
+
+    config = ReferenceConfig(base_dir=output_dir)
+    mgr = ReferenceManager(config)
+
+    refs = mgr.list_references()
+    if not refs:
+        typer.echo(f"no references found under {output_dir}")
+        return
+
+    updated = skipped = failed = 0
+    for ref in refs:
+        slug = str(ref.get("slug", ""))
+        text = str(ref.get("text", "")).strip()
+        has_phonemes = isinstance(ref.get("phonemes"), dict) and bool(
+            ref["phonemes"].get("tokens")  # type: ignore[union-attr]
+        )
+        if not text:
+            typer.echo(f"  SKIP  {slug}  (no 'text' field)")
+            failed += 1
+            continue
+        if has_phonemes and not force:
+            typer.echo(f"  HAVE  {slug}  (use --force to recompute)")
+            skipped += 1
+            continue
+
+        # text → G2P → normalize → tokenize (not just normalize; misaki must
+        # run first to convert the reference text into phonemes).
+        tokens = text_to_espeak_tokens(text)
+        if not tokens:
+            typer.echo(f"  FAIL  {slug}  (G2P produced no tokens for {text!r})")
+            failed += 1
+            continue
+
+        if dry_run:
+            typer.echo(f"  WOULD {slug}  ({len(tokens)} tokens)")
+            updated += 1
+            continue
+
+        mgr.set_phonemes(slug, tokens)
+        typer.echo(f"  WROTE {slug}  ({len(tokens)} tokens)")
+        updated += 1
+
+    summary = f"\n{updated} updated, {skipped} skipped, {failed} failed"
+    if dry_run:
+        summary += "  (dry-run — no files written)"
+    typer.echo(summary)
+
+
 @app.command("record")
 def record_cmd(
     output: Annotated[

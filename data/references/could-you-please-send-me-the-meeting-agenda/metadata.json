@@ -2,7 +2,7 @@
   "text": "Could you please send me the meeting agenda?",
   "language": "en-us",
   "default_speaker": "af_heart",
-  "updated_at": "2026-06-22T19:14:43+00:00",
+  "updated_at": "2026-06-24T08:01:33+00:00",
   "audio": {
     "kokoro-en-us-af_heart": {
       "file": "audio/kokoro-en-us-af_heart/ref.wav",
@@ -59,5 +59,37 @@
       "sample_rate": 24000,
       "engine": "kokoro"
     }
+  },
+  "phonemes": {
+    "tokens": [
+      "k",
+      "ʊ",
+      "d",
+      "ju",
+      "p",
+      "l",
+      "i",
+      "z",
+      "s",
+      "ɛ",
+      "n",
+      "d",
+      "m",
+      "i",
+      "ð",
+      "ə",
+      "m",
+      "i",
+      "ɪ",
+      "ŋ",
+      "ə",
+      "dʒ",
+      "ɛ",
+      "n",
+      "d",
+      "ə"
+    ],
+    "source": "kokoro-g2p",
+    "notation": "espeak-wav2vec2"
   }
 }

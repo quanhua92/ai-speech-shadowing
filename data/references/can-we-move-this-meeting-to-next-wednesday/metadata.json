@@ -2,7 +2,7 @@
   "text": "Can we move this meeting to next Wednesday?",
   "language": "en-us",
   "default_speaker": "af_heart",
-  "updated_at": "2026-06-22T19:15:26+00:00",
+  "updated_at": "2026-06-24T08:01:32+00:00",
   "audio": {
     "kokoro-en-us-af_heart": {
       "file": "audio/kokoro-en-us-af_heart/ref.wav",
@@ -59,5 +59,39 @@
       "sample_rate": 24000,
       "engine": "kokoro"
     }
+  },
+  "phonemes": {
+    "tokens": [
+      "k",
+      "æ",
+      "n",
+      "w",
+      "i",
+      "m",
+      "u",
+      "v",
+      "ð",
+      "ɪ",
+      "s",
+      "m",
+      "i",
+      "ɪ",
+      "ŋ",
+      "t",
+      "ə",
+      "n",
+      "ɛ",
+      "k",
+      "s",
+      "t",
+      "w",
+      "ɛ",
+      "n",
+      "z",
+      "d",
+      "eɪ"
+    ],
+    "source": "kokoro-g2p",
+    "notation": "espeak-wav2vec2"
   }
 }

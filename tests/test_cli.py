@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -195,3 +196,183 @@ def test_batch_evaluates_directory(
     from ai_speech_shadowing.core.history import list_reports
 
     assert len(list_reports(history)) == 2
+
+
+# --------------------------------------------------------------------------- #
+# backfill-phonemes (fast: G2P is mocked so no misaki / HF vocab load)
+# --------------------------------------------------------------------------- #
+def _seed_ref_without_phonemes(base: Path, slug: str, text: str) -> None:
+    """Plant a minimal reference folder with text but no phonemes block."""
+    d = base / slug
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "metadata.json").write_text(json.dumps({"text": text, "default_speaker": "af_heart"}))
+
+
+def _seed_ref_with_phonemes(base: Path, slug: str, text: str, tokens: list[str]) -> None:
+    d = base / slug
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "metadata.json").write_text(
+        json.dumps(
+            {
+                "text": text,
+                "default_speaker": "af_heart",
+                "phonemes": {
+                    "tokens": tokens,
+                    "source": "kokoro-g2p",
+                    "notation": "espeak-wav2vec2",
+                },
+            }
+        )
+    )
+
+
+class TestBackfillPhonemes:
+    """Verify the backfill CLI command without invoking misaki / HF vocab.
+
+    The G2P callable is monkeypatched to a deterministic stub so the tests stay
+    fast (no model download, no espeak vocab load). The integration with the
+    real misaki is exercised end-to-end by the slow test below.
+    """
+
+    def test_backfill_populates_missing_field(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from ai_speech_shadowing.core import g2p as g2p_mod
+
+        monkeypatch.setattr(
+            g2p_mod,
+            "text_to_espeak_tokens",
+            lambda s: ("h", "ə", "l", "oʊ") if "hello" in s.lower() else ("x",),
+        )
+        _seed_ref_without_phonemes(tmp_path, "hello-world", "Hello world")
+
+        result = runner.invoke(app, ["backfill-phonemes", "--output-dir", str(tmp_path)])
+        assert result.exit_code == 0, result.stdout
+        assert "WROTE" in result.stdout
+        assert "1 updated" in result.stdout
+
+        meta = json.loads((tmp_path / "hello-world" / "metadata.json").read_text())
+        assert meta["phonemes"]["tokens"] == ["h", "ə", "l", "oʊ"]
+        assert meta["phonemes"]["source"] == "kokoro-g2p"
+
+    def test_backfill_skips_existing_without_force(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from ai_speech_shadowing.core import g2p as g2p_mod
+
+        monkeypatch.setattr(g2p_mod, "text_to_espeak_tokens", lambda s: ("NEW",))
+        _seed_ref_with_phonemes(tmp_path, "hello", "Hello", ["OLD"])
+
+        result = runner.invoke(app, ["backfill-phonemes", "--output-dir", str(tmp_path)])
+        assert result.exit_code == 0, result.stdout
+        assert "HAVE" in result.stdout
+        assert "1 skipped" in result.stdout
+
+        # Unchanged — the existing block was not overwritten.
+        meta = json.loads((tmp_path / "hello" / "metadata.json").read_text())
+        assert meta["phonemes"]["tokens"] == ["OLD"]
+
+    def test_backfill_force_overwrites(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from ai_speech_shadowing.core import g2p as g2p_mod
+
+        monkeypatch.setattr(g2p_mod, "text_to_espeak_tokens", lambda s: ("NEW", "toks"))
+        _seed_ref_with_phonemes(tmp_path, "hello", "Hello", ["OLD"])
+
+        result = runner.invoke(app, ["backfill-phonemes", "--output-dir", str(tmp_path), "--force"])
+        assert result.exit_code == 0, result.stdout
+        assert "WROTE" in result.stdout
+        assert "1 updated" in result.stdout
+
+        meta = json.loads((tmp_path / "hello" / "metadata.json").read_text())
+        assert meta["phonemes"]["tokens"] == ["NEW", "toks"]
+
+    def test_backfill_dry_run_writes_nothing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from ai_speech_shadowing.core import g2p as g2p_mod
+
+        monkeypatch.setattr(g2p_mod, "text_to_espeak_tokens", lambda s: ("h", "ə"))
+        _seed_ref_without_phonemes(tmp_path, "hi", "Hi")
+
+        result = runner.invoke(
+            app, ["backfill-phonemes", "--output-dir", str(tmp_path), "--dry-run"]
+        )
+        assert result.exit_code == 0, result.stdout
+        assert "WOULD" in result.stdout
+        assert "dry-run" in result.stdout
+
+        # No write happened.
+        meta = json.loads((tmp_path / "hi" / "metadata.json").read_text())
+        assert "phonemes" not in meta
+
+    def test_backfill_idempotent_second_run_is_noop(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from ai_speech_shadowing.core import g2p as g2p_mod
+
+        monkeypatch.setattr(g2p_mod, "text_to_espeak_tokens", lambda s: ("h", "ə", "l", "oʊ"))
+        _seed_ref_without_phonemes(tmp_path, "hello-world", "Hello world")
+
+        # First run populates.
+        r1 = runner.invoke(app, ["backfill-phonemes", "--output-dir", str(tmp_path)])
+        assert r1.exit_code == 0
+        assert "1 updated" in r1.stdout
+
+        # Second run skips (block now present).
+        r2 = runner.invoke(app, ["backfill-phonemes", "--output-dir", str(tmp_path)])
+        assert r2.exit_code == 0
+        assert "1 skipped" in r2.stdout
+        assert "0 updated" in r2.stdout
+
+    def test_backfill_empty_dir_reports_no_references(self, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["backfill-phonemes", "--output-dir", str(tmp_path)])
+        assert result.exit_code == 0, result.stdout
+        assert "no references" in result.stdout
+
+    def test_backfill_skips_refs_without_text(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from ai_speech_shadowing.core import g2p as g2p_mod
+
+        monkeypatch.setattr(g2p_mod, "text_to_espeak_tokens", lambda s: ("x",))
+        d = tmp_path / "no-text"
+        d.mkdir(parents=True)
+        # metadata.json exists but has no text field — must SKIP, not crash.
+        (d / "metadata.json").write_text(json.dumps({"default_speaker": "af_heart"}))
+
+        result = runner.invoke(app, ["backfill-phonemes", "--output-dir", str(tmp_path)])
+        assert result.exit_code == 0, result.stdout
+        assert "SKIP" in result.stdout
+        assert "1 failed" in result.stdout  # counted as a failure to backfill
+
+
+@pytest.mark.slow
+def test_backfill_uses_real_misaki_g2p(tmp_path: Path) -> None:
+    """Integration test: the backfill command runs real misaki G2P on the
+    reference text and produces sensible espeak tokens.
+
+    Catches regressions where the CLI accidentally passes the raw text into the
+    phoneme-normalization path (which would yield character-level junk tokens
+    instead of real phonemes — a real bug that shipped undetected by the mocked
+    fast tests until this test was added).
+    """
+    _seed_ref_without_phonemes(tmp_path, "hello-world", "Hello world")
+
+    result = runner.invoke(app, ["backfill-phonemes", "--output-dir", str(tmp_path)])
+    assert result.exit_code == 0, result.stdout
+    assert "1 updated" in result.stdout
+
+    meta = json.loads((tmp_path / "hello-world" / "metadata.json").read_text())
+    tokens = meta["phonemes"]["tokens"]
+    # Sanity: real G2P for "Hello world" starts with /h/ and contains the GOAT
+    # diphthong /oʊ/ (not character-level "o" + "ʊ" junk). Also asserts the
+    # tokens came from the espeak vocab, not raw text characters.
+    assert tokens[0] == "h"
+    assert "oʊ" in tokens
+    # The character "ʊ" alone is NOT an espeak token in this vocabulary — its
+    # presence would indicate the bug where raw text was tokenized char-by-char.
+    assert "ʊ" not in tokens
+    assert meta["phonemes"]["source"] == "kokoro-g2p"
+    assert meta["phonemes"]["notation"] == "espeak-wav2vec2"

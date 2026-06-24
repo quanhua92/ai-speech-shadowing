@@ -2,7 +2,7 @@
   "text": "Does anyone have any questions before we wrap up?",
   "language": "en-us",
   "default_speaker": "af_heart",
-  "updated_at": "2026-06-22T19:15:31+00:00",
+  "updated_at": "2026-06-24T08:01:33+00:00",
   "audio": {
     "kokoro-en-us-af_heart": {
       "file": "audio/kokoro-en-us-af_heart/ref.wav",
@@ -59,5 +59,45 @@
       "sample_rate": 24000,
       "engine": "kokoro"
     }
+  },
+  "phonemes": {
+    "tokens": [
+      "d",
+      "ʌ",
+      "z",
+      "ɛ",
+      "n",
+      "i",
+      "w",
+      "ʌ",
+      "n",
+      "h",
+      "æ",
+      "v",
+      "ɛ",
+      "n",
+      "i",
+      "k",
+      "w",
+      "ɛ",
+      "s",
+      "tʃ",
+      "n",
+      "z",
+      "b",
+      "ə",
+      "f",
+      "ɔ",
+      "ɹ",
+      "w",
+      "i",
+      "ɹ",
+      "æ",
+      "p",
+      "ʌ",
+      "p"
+    ],
+    "source": "kokoro-g2p",
+    "notation": "espeak-wav2vec2"
   }
 }

@@ -2,7 +2,7 @@
   "text": "Thank you for your hard work on this project.",
   "language": "en-us",
   "default_speaker": "af_heart",
-  "updated_at": "2026-06-22T19:15:23+00:00",
+  "updated_at": "2026-06-24T08:01:39+00:00",
   "audio": {
     "kokoro-en-us-af_heart": {
       "file": "audio/kokoro-en-us-af_heart/ref.wav",
@@ -59,5 +59,41 @@
       "sample_rate": 24000,
       "engine": "kokoro"
     }
+  },
+  "phonemes": {
+    "tokens": [
+      "θ",
+      "æ",
+      "ŋ",
+      "k",
+      "ju",
+      "f",
+      "ɔ",
+      "ɹ",
+      "j",
+      "ʊɹ",
+      "h",
+      "ɑ",
+      "ɹ",
+      "d",
+      "w",
+      "ɜ",
+      "ɹ",
+      "k",
+      "ɔ",
+      "n",
+      "ð",
+      "ɪ",
+      "s",
+      "p",
+      "ɹ",
+      "ɑ",
+      "dʒ",
+      "ɛ",
+      "k",
+      "t"
+    ],
+    "source": "kokoro-g2p",
+    "notation": "espeak-wav2vec2"
   }
 }

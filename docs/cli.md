@@ -22,6 +22,7 @@ Commands:
 | `fluency` | MFCC + DTW comparison of two files. |
 | `evaluate` | **Full pipeline** → unified `FeedbackReport` (saved to history). |
 | `generate-reference` | Kokoro TTS reference (single `--text` or `--list` batch). |
+| `backfill-phonemes` | Populate cached G2P phonemes for references that predate capture-at-gen. |
 | `record` | Record user audio from the microphone. |
 | `batch` | Evaluate every recording in a directory against one reference. |
 | `report` | List saved reports, or view one in detail. |
@@ -87,6 +88,32 @@ report is persisted to the history directory as `eval_<id>.json` (pass
 See [`tts-reference.md`](tts-reference.md). `--text "…"` for a single reference,
 `--list sentences.txt` for a batch; `--voice`, `--lang`, `--output-dir`,
 `--force`.
+
+### `backfill-phonemes`
+
+```bash
+ai-speech-shadowing backfill-phonemes [--output-dir DIR] [--force] [--dry-run]
+```
+
+One-shot migration command for references created before the
+capture-at-synthesis change. For every reference under `--output-dir` with a
+stored `text` field, runs misaki G2P on the text and persists the normalized
+espeak tokens to `metadata.json["phonemes"]` — the same field
+`generate-reference` populates at synthesis time. References that already have
+the block are skipped unless `--force` is given.
+
+Idempotent and safe to re-run. `--dry-run` previews without writing. Use once
+after upgrading to populate existing references without re-synthesizing their
+audio:
+
+```bash
+ai-speech-shadowing backfill-phonemes            # populate missing
+ai-speech-shadowing backfill-phonemes --force    # recompute everything
+ai-speech-shadowing backfill-phonemes --dry-run  # preview only
+```
+
+The first call downloads the Wav2Vec2 `vocab.json` (small) into the HF cache;
+subsequent calls reuse it.
 
 ### `record`
 
@@ -172,7 +199,12 @@ Long operations report progress with [`rich`](https://rich.readthedocs.io/):
   delete (hit/miss); `format_summary` content.
 - `tests/test_cli.py` (fast): global `--verbose`/`--quiet` accepted; `record`
   writes a WAV with `sounddevice` mocked; `report` list / view-by-id /
-  view-json / empty / missing-id.
+  view-json / empty / missing-id; `backfill-phonemes` (G2P mocked) covers
+  populate, skip-existing, `--force`, `--dry-run`, idempotency, empty dir,
+  missing-text, and `--help`.
 - `tests/test_cli.py::test_batch_evaluates_directory` (opt-in slow): evaluates
   a directory of two recordings against a Kokoro reference, asserts the summary
   line and that two reports were saved.
+- `tests/test_cli.py::test_backfill_uses_real_misaki_g2p` (opt-in slow):
+  regression test that the backfill command actually runs misaki G2P (not just
+  raw-text normalization) and produces real espeak diphthongs/affricates.

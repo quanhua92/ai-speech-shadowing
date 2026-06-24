@@ -269,6 +269,44 @@ class ReferenceManager:
             # A corrupt metadata.json must not crash listing/get for all refs.
             return {}
 
+    def set_phonemes(
+        self,
+        slug: str,
+        tokens: Sequence[str],
+        *,
+        source: str = "kokoro-g2p",
+        notation: str = "espeak-wav2vec2",
+    ) -> Path:
+        """Overwrite the ``phonemes`` block on ``<slug>/metadata.json``.
+
+        Unlike :meth:`write_metadata` (which uses ``setdefault`` so the first
+        voice's G2P wins), this method unconditionally writes the field — it's
+        the entry point used by the ``backfill-phonemes`` CLI to populate or
+        refresh references that predate the capture-at-synthesis change.
+
+        Raises ``KeyError`` if the slug has no metadata.json (the backfill
+        command should skip these) and ``ValueError`` if the metadata has no
+        ``text`` field to derive phonemes from.
+        """
+        path = self.metadata_path(slug)
+        with self._meta_lock:
+            if not path.is_file():
+                raise KeyError(f"no metadata.json for slug {slug!r}")
+            try:
+                data: dict[str, object] = json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as e:
+                raise KeyError(f"corrupt metadata.json for slug {slug!r}") from e
+            data["phonemes"] = {
+                "tokens": list(tokens),
+                "source": source,
+                "notation": notation,
+            }
+            data["updated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+            tmp = path.with_name(path.name + ".tmp")
+            tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp, path)
+        return path
+
     def list_references(self) -> list[dict[str, object]]:
         """List every slug folder that has a metadata.json."""
         base = self.config.base_dir

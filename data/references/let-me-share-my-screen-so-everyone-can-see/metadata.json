@@ -2,7 +2,7 @@
   "text": "Let me share my screen so everyone can see.",
   "language": "en-us",
   "default_speaker": "af_heart",
-  "updated_at": "2026-06-22T19:14:59+00:00",
+  "updated_at": "2026-06-24T08:01:37+00:00",
   "audio": {
     "kokoro-en-us-af_heart": {
       "file": "audio/kokoro-en-us-af_heart/ref.wav",
@@ -59,5 +59,39 @@
       "sample_rate": 24000,
       "engine": "kokoro"
     }
+  },
+  "phonemes": {
+    "tokens": [
+      "l",
+      "ɛ",
+      "t",
+      "m",
+      "i",
+      "ʃ",
+      "ɛɹ",
+      "m",
+      "aɪ",
+      "s",
+      "k",
+      "ɹ",
+      "i",
+      "n",
+      "s",
+      "oʊ",
+      "ɛ",
+      "v",
+      "ɹ",
+      "i",
+      "w",
+      "ə",
+      "n",
+      "k",
+      "æ",
+      "n",
+      "s",
+      "i"
+    ],
+    "source": "kokoro-g2p",
+    "notation": "espeak-wav2vec2"
   }
 }

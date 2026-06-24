@@ -32,7 +32,10 @@ self-signed TLS cert so the microphone works from other devices.
 The repo ships with **30 pre-generated Kokoro references** (`data/references/`)
 covering common workplace English — meetings, deadlines, code review, small
 talk, and more. See [`data/default.txt`](data/default.txt) for the full list.
-Pick one in the demo, record your attempt, and get instant feedback.
+Each reference carries a cached G2P phoneme block
+(`metadata.json["phonemes"]`) so evaluations skip acoustic recognition on the
+reference side entirely. Pick one in the demo, record your attempt, and get
+instant feedback.
 
 To add your own:
 

@@ -2,7 +2,7 @@
   "text": "I'd like to follow up on the action items from our last meeting.",
   "language": "en-us",
   "default_speaker": "af_heart",
-  "updated_at": "2026-06-22T19:14:54+00:00",
+  "updated_at": "2026-06-24T08:01:36+00:00",
   "audio": {
     "kokoro-en-us-af_heart": {
       "file": "audio/kokoro-en-us-af_heart/ref.wav",
@@ -59,5 +59,52 @@
       "sample_rate": 24000,
       "engine": "kokoro"
     }
+  },
+  "phonemes": {
+    "tokens": [
+      "aɪ",
+      "d",
+      "l",
+      "aɪ",
+      "k",
+      "t",
+      "ə",
+      "f",
+      "ɑ",
+      "l",
+      "oʊ",
+      "ʌ",
+      "p",
+      "ɔ",
+      "n",
+      "ð",
+      "i",
+      "æ",
+      "k",
+      "ʃ",
+      "ə",
+      "n",
+      "aɪ",
+      "ə",
+      "m",
+      "z",
+      "f",
+      "ɹ",
+      "ʌ",
+      "m",
+      "aʊ",
+      "ə",
+      "ɹ",
+      "l",
+      "æ",
+      "s",
+      "t",
+      "m",
+      "i",
+      "ɪ",
+      "ŋ"
+    ],
+    "source": "kokoro-g2p",
+    "notation": "espeak-wav2vec2"
   }
 }
