@@ -95,13 +95,16 @@ def _run_evaluation(
 
 def _stamp_field(path, field: str, value: object) -> None:
     import json
+    import os
 
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         data[field] = value
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, path)
     except (OSError, json.JSONDecodeError):
-        pass
+        logger.warning("failed to stamp %s on %s", field, path, exc_info=True)
 
 
 def _stamp_reference_id(path, reference_id: str | None) -> None:

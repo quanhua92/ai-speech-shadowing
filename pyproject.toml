@@ -7,7 +7,7 @@ license = { text = "MIT" }
 authors = [
     { name = "Quan Hua", email = "quanhua92@gmail.com" }
 ]
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.138.0",
     "fastdtw>=0.3.4",
@@ -16,14 +16,17 @@ dependencies = [
     "numpy>=2.4.6",
     "praat-parselmouth>=0.4.7",
     "python-multipart>=0.0.32",
+    "rich>=13.0.0",
     "scipy>=1.18.0",
-    "sounddevice>=0.5.5",
     "soundfile>=0.14.0",
     "torch>=2.12.1",
     "transformers>=5.12.1",
     "typer>=0.25.1",
     "uvicorn[standard]>=0.49.0",
 ]
+
+[project.optional-dependencies]
+cli = ["sounddevice>=0.5.5"]
 
 [project.scripts]
 ai-speech-shadowing = "ai_speech_shadowing:main"

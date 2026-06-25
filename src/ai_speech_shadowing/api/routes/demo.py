@@ -29,8 +29,9 @@ def _find_index() -> Path:
 
 
 _INDEX_HTML = _find_index()
+_INDEX_HTML_CONTENT = _INDEX_HTML.read_text(encoding="utf-8")
 
 
 @router.get("/", include_in_schema=False)
 def demo() -> HTMLResponse:
-    return HTMLResponse(_INDEX_HTML.read_text(encoding="utf-8"))
+    return HTMLResponse(_INDEX_HTML_CONTENT)

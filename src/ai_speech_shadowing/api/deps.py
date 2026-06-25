@@ -11,13 +11,9 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from ai_speech_shadowing.core.phoneme import PhonemeExtractor, get_extractor
 from ai_speech_shadowing.tts.generator import ReferenceConfig, ReferenceManager
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass
@@ -49,8 +45,9 @@ class EngineState:
         return self._extractor
 
     def mark_tts_loaded(self, *, load_time_ms: int) -> None:
+        if not self.tts_available:
+            self.tts_load_time_ms = load_time_ms
         self.tts_available = True
-        self.tts_load_time_ms = load_time_ms
 
 
 _state: EngineState | None = None

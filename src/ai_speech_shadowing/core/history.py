@@ -219,7 +219,7 @@ def delete_report(
     path = _find_report_path(report_id, history_dir, user_id, suffix=".json")
     if path is None or not path.is_file():
         return False
-    path.unlink()
+    path.unlink(missing_ok=True)
     return True
 
 

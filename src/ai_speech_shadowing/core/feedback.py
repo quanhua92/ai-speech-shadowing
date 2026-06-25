@@ -110,7 +110,7 @@ def build_report(
     into = _score100(prosody_diff.score)
     flu = _score100(fluency_diff.score)
     w0, w1, w2 = weights
-    composite = round(pron * w0 + into * w1 + flu * w2)
+    composite = round(max(0.0, min(100.0, pron * w0 + into * w1 + flu * w2)))
 
     feedback = _generate_feedback(
         phoneme_diff, prosody_diff, fluency_diff, pron, into, flu, language=language

@@ -1,4 +1,4 @@
-"""Per-browser user identity via a signed cookie.
+"""Per-browser user identity via a random-token cookie.
 
 Each browser is assigned a random token (carried by the ``user_id`` cookie) on
 first visit. The token itself is never written to disk — only its SHA-256

@@ -33,9 +33,6 @@ MIN_SAMPLE_RATE: int = 1000
 MAX_SAMPLE_RATE: int = 192_000
 MAX_DURATION_SECONDS: float = 120.0
 
-PEAK_HEADROOM_DB: float = 0.0
-"""Reserved headroom in dB for peak normalization (0 dBFS == 1.0 by default)."""
-
 
 class AudioLoadError(ValueError):
     """Raised when an audio file cannot be loaded or fails validation."""

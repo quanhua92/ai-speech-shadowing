@@ -39,12 +39,12 @@ fi
 
 if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
   echo "Generating self-signed TLS cert..."
-  mkdir -p tmp
   openssl req -x509 -newkey rsa:2048 -nodes \
     -keyout "$KEY" -out "$CERT" -days 365 -subj "/CN=localhost" 2>/dev/null
 fi
 
-export PYTORCH_ENABLE_MPS_FALLBACK=1
+# MPS fallback only applies on macOS; harmless but unnecessary on Linux.
+# export PYTORCH_ENABLE_MPS_FALLBACK=1
 LOG="/tmp/ai-speech-shadowing-${PORT}.log"
 if [ -t 1 ]; then
   exec uv run ai-speech-shadowing serve \

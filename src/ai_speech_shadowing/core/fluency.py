@@ -84,6 +84,7 @@ def extract_mfcc(
     )
     matrix = mfcc.T.astype(np.float64)  # (n_frames, n_mfcc)
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+    norms[~np.isfinite(norms)] = 1.0
     norms[norms == 0.0] = 1.0
     matrix = matrix / norms
     times = librosa.frames_to_time(
