@@ -152,7 +152,10 @@ The demo UI uses this field to label the alignment section: `(target)` for G2P
 sources, `(recognized)` for the acoustic fallback. See
 [`phoneme-extraction.md`](phoneme-extraction.md) for the full rationale.
 
-Every evaluation is persisted to the history store automatically.
+Every evaluation is persisted to the history store automatically. History is
+**scoped per-browser** via a `user_id` cookie (set automatically on first visit);
+each user only sees their own evaluations. See [`storage.md`](storage.md) for
+the identity model, storage layout, and retention configuration.
 
 ### History & stats
 

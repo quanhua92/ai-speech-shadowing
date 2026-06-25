@@ -325,7 +325,7 @@ def evaluate_cmd(
     report = evaluate(ref, hyp, weights=_parse_weights(weights), reference_text=reference_text)
 
     if not no_save:
-        path = save_report(report, history_dir=history_dir)
+        path = save_report(report, history_dir=history_dir, user_id="_cli")
         typer.echo(f"saved {path}", err=True)
 
     rendered = {
@@ -564,7 +564,7 @@ def batch_cmd(
         for wav in recordings:
             hyp = prep(AudioSample.from_wav(wav))
             report = evaluate(ref, hyp, phoneme_extractor=extractor)
-            save_report(report, history_dir=history_dir)
+            save_report(report, history_dir=history_dir, user_id="_cli")
             results.append((wav.name, report.composite_score, report.composite_grade))
             progress.advance(task)
 

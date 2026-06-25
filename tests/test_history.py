@@ -12,6 +12,7 @@ from ai_speech_shadowing.core.feedback import FeedbackReport, build_report
 from ai_speech_shadowing.core.fluency import DtwResult, FluencyDiff, PauseInfo
 from ai_speech_shadowing.core.history import (
     HistoryEntry,
+    cleanup_old_reports,
     delete_report,
     format_summary,
     list_reports,
@@ -149,3 +150,121 @@ class TestFormatSummary:
         assert "Composite: 100/100" in summary
         assert "Pronunciation" in summary
         assert "Feedback:" in summary
+
+
+# --------------------------------------------------------------------------- #
+# Per-user scoping
+# --------------------------------------------------------------------------- #
+_UID_A = "a" * 64  # valid 64-hex user id
+_UID_B = "b" * 64
+
+
+class TestUserScoping:
+    def test_save_creates_user_subdirectory(self, history_dir: Path) -> None:
+        path = save_report(_report(), history_dir=history_dir, user_id=_UID_A)
+        assert _UID_A in path.parts
+        assert path.is_file()
+
+    def test_list_scoped_to_user(self, history_dir: Path) -> None:
+        save_report(_report(), history_dir=history_dir, user_id=_UID_A)
+        save_report(_report(), history_dir=history_dir, user_id=_UID_A)
+        save_report(_report(), history_dir=history_dir, user_id=_UID_B)
+        assert len(list_reports(history_dir, user_id=_UID_A)) == 2
+        assert len(list_reports(history_dir, user_id=_UID_B)) == 1
+
+    def test_user_cannot_load_another_users_report(self, history_dir: Path) -> None:
+        path = save_report(_report(), history_dir=history_dir, user_id=_UID_A)
+        rid = path.stem
+        # owner can load
+        assert load_report(rid, history_dir, user_id=_UID_A) is not None
+        # other user cannot
+        assert load_report(rid, history_dir, user_id=_UID_B) is None
+
+    def test_user_cannot_delete_another_users_report(self, history_dir: Path) -> None:
+        path = save_report(_report(), history_dir=history_dir, user_id=_UID_A)
+        rid = path.stem
+        assert delete_report(rid, history_dir, user_id=_UID_B) is False
+        assert path.is_file()  # still there
+
+    def test_none_user_sees_all(self, history_dir: Path) -> None:
+        save_report(_report(), history_dir=history_dir, user_id=_UID_A)
+        save_report(_report(), history_dir=history_dir, user_id=_UID_B)
+        save_report(_report(), history_dir=history_dir, user_id="_cli")
+        # user_id=None scans every subdirectory (CLI report view)
+        assert len(list_reports(history_dir, user_id=None)) == 3
+
+    def test_cli_user_is_the_default_bucket(self, history_dir: Path) -> None:
+        path = save_report(_report(), history_dir=history_dir)  # user_id=None
+        assert "_cli" in path.parts
+        # visible via all-users scan
+        assert len(list_reports(history_dir)) == 1
+
+    def test_report_path_with_user_segment(self, history_dir: Path) -> None:
+        p = report_path("eval_abc12345", history_dir, user_id=_UID_A, suffix=".json")
+        assert p == history_dir / _UID_A / "eval_abc12345.json"
+
+    def test_report_path_rejects_bad_user_id(self, history_dir: Path) -> None:
+        assert report_path("eval_abc", history_dir, user_id="../escape", suffix=".json") is None
+
+
+# --------------------------------------------------------------------------- #
+# Retention cleanup
+# --------------------------------------------------------------------------- #
+class TestCleanup:
+    def test_zero_retention_is_noop(self, history_dir: Path) -> None:
+        save_report(_report(), history_dir=history_dir, user_id=_UID_A)
+        assert cleanup_old_reports(history_dir, retention_days=0) == 0
+        assert len(list_reports(history_dir, user_id=_UID_A)) == 1
+
+    def test_deletes_old_reports(self, history_dir: Path) -> None:
+        """Reports with created_at older than retention are removed."""
+        from datetime import UTC, datetime, timedelta
+
+        old = save_report(_report(), history_dir=history_dir, user_id=_UID_A)
+        # rewrite created_at to 30 days ago
+        data = json.loads(old.read_text())
+        data["created_at"] = (datetime.now(UTC) - timedelta(days=30)).isoformat(timespec="seconds")
+        old.write_text(json.dumps(data))
+        recent = save_report(_report(), history_dir=history_dir, user_id=_UID_A)
+
+        deleted = cleanup_old_reports(history_dir, retention_days=7)
+        assert deleted == 1
+        assert not old.is_file()
+        assert recent.is_file()
+
+    def test_deletes_wav_alongside_json(self, history_dir: Path) -> None:
+        from datetime import UTC, datetime, timedelta
+
+        old = save_report(_report(), history_dir=history_dir, user_id=_UID_A)
+        wav = old.with_suffix(".wav")
+        wav.write_bytes(b"fake audio")
+        data = json.loads(old.read_text())
+        data["created_at"] = (datetime.now(UTC) - timedelta(days=30)).isoformat(timespec="seconds")
+        old.write_text(json.dumps(data))
+
+        cleanup_old_reports(history_dir, retention_days=7)
+        assert not old.is_file()
+        assert not wav.is_file()
+
+    def test_removes_empty_user_dirs(self, history_dir: Path) -> None:
+        from datetime import UTC, datetime, timedelta
+
+        old = save_report(_report(), history_dir=history_dir, user_id=_UID_A)
+        data = json.loads(old.read_text())
+        data["created_at"] = (datetime.now(UTC) - timedelta(days=30)).isoformat(timespec="seconds")
+        old.write_text(json.dumps(data))
+
+        cleanup_old_reports(history_dir, retention_days=7)
+        assert not (history_dir / _UID_A).exists()
+
+    def test_cleans_legacy_flat_files_too(self, history_dir: Path) -> None:
+        """Top-level eval_*.json (pre-feature) are also aged out."""
+        from datetime import UTC, datetime, timedelta
+
+        old = save_report(_report(), history_dir=history_dir)  # goes to _cli/
+        data = json.loads(old.read_text())
+        data["created_at"] = (datetime.now(UTC) - timedelta(days=30)).isoformat(timespec="seconds")
+        old.write_text(json.dumps(data))
+
+        assert cleanup_old_reports(history_dir, retention_days=7) == 1
+        assert not old.is_file()

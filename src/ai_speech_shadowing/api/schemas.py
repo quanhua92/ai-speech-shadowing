@@ -233,8 +233,11 @@ def build_history_item(data: dict) -> HistoryItem:
     )
 
 
-def iter_history_dicts(history_dir) -> Iterable[dict]:
-    """Yield every saved report dict in a history dir (used by stats too)."""
+def iter_history_dicts(history_dir, user_id=None) -> Iterable[dict]:
+    """Yield every saved report dict in a history dir (used by stats too).
+
+    Scoped to ``user_id`` when given; otherwise scans all subdirectories.
+    """
     import json
     from pathlib import Path
 
@@ -242,7 +245,11 @@ def iter_history_dicts(history_dir) -> Iterable[dict]:
     if not base.is_dir():
         return []
     out = []
-    for path in sorted(base.glob("eval_*.json")):
+    if user_id is not None:
+        paths = sorted((base / user_id).glob("eval_*.json")) if (base / user_id).is_dir() else []
+    else:
+        paths = sorted(base.rglob("eval_*.json"))
+    for path in paths:
         try:
             out.append(json.loads(path.read_text(encoding="utf-8")))
         except (json.JSONDecodeError, OSError):

@@ -79,6 +79,10 @@ backend is available as a fallback. See
 [`docs/phoneme-extraction.md`](docs/phoneme-extraction.md) and
 [`docs/feedback-scoring.md`](docs/feedback-scoring.md) for details.
 
+History is **private per-browser** (a hashed identity cookie scopes each user's
+evaluations) and **auto-cleaned** after a configurable retention window — see
+[`docs/storage.md`](docs/storage.md).
+
 ## Development
 
 After cloning, install dependencies and activate the project-local Git hooks:

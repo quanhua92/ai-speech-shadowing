@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from ai_speech_shadowing.api.deps import get_state
 from ai_speech_shadowing.api.routes.reference import _iso_lang_to_kokoro
@@ -30,6 +30,7 @@ def _decode_upload(upload: UploadFile) -> tuple[AudioSample, bytes]:
 
 def _run_evaluation(
     *,
+    request: Request,
     reference_audio: AudioSample,
     user_audio: AudioSample,
     reference_id: str | None,
@@ -44,6 +45,7 @@ def _run_evaluation(
     """Preprocess both signals, evaluate, persist (report + attempt audio), respond."""
     state = get_state()
     extractor = state.phoneme_extractor()
+    user_id = getattr(request.state, "user_id", None)
     ref = preprocess(reference_audio)
     hyp = preprocess(user_audio)
     eval_kwargs: dict[str, object] = {}
@@ -65,7 +67,7 @@ def _run_evaluation(
         **eval_kwargs,
     )
 
-    path = save_report(report, history_dir=state.history_dir)
+    path = save_report(report, history_dir=state.history_dir, user_id=user_id)
     eval_id = path.stem
     # stamp reference_id onto the saved report for history/stats
     _stamp_reference_id(path, reference_id)
@@ -73,7 +75,7 @@ def _run_evaluation(
     # persist the user's attempt audio so history rows can replay it
     audio_url: str | None = None
     if attempt_bytes:
-        audio_path = state.history_dir / f"{eval_id}.wav"
+        audio_path = state.history_dir / (user_id or "_cli") / f"{eval_id}.wav"
         audio_path.parent.mkdir(parents=True, exist_ok=True)
         audio_path.write_bytes(attempt_bytes)
         audio_url = f"/api/v1/history/{eval_id}/audio"
@@ -129,6 +131,7 @@ def _read_reference_phonemes(manager, reference_id: str) -> list[str] | None:
 
 @router.post("/evaluate", response_model=EvaluationResponse)
 def evaluate(
+    request: Request,
     audio: Annotated[UploadFile, File(description="User audio (WAV/WebM/MP3).")],
     reference_id: Annotated[str, Form(description="Reference slug to compare against.")],
     weight_pronunciation: Annotated[
@@ -171,6 +174,7 @@ def evaluate(
     weights = tuple(w / wsum for w in raw_w)
 
     return _run_evaluation(
+        request=request,
         reference_audio=reference_audio,
         user_audio=user_audio,
         reference_id=reference_id,
@@ -186,6 +190,7 @@ def evaluate(
 
 @router.post("/evaluate/quick", response_model=EvaluationResponse)
 def evaluate_quick(
+    request: Request,
     audio: Annotated[UploadFile, File(description="User audio (WAV/WebM/MP3).")],
     text: Annotated[str, Form(min_length=1, max_length=500, description="Target sentence.")],
     language: Annotated[str, Form(description="Language code, e.g. 'en'.")] = "en",
@@ -208,6 +213,7 @@ def evaluate_quick(
     reference_phonemes = _read_reference_phonemes(state.reference_manager, slug)
 
     return _run_evaluation(
+        request=request,
         reference_audio=reference_audio,
         user_audio=user_audio,
         reference_id=slug,

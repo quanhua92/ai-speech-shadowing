@@ -156,17 +156,21 @@ JSON form. History lives under `data/history/` by default.
 
 ## Report persistence
 
-Reports are stored as JSON via `ai_speech_shadowing.core.history`:
+CLI evaluations are saved under the fixed `_cli` user bucket
+(`data/history/_cli/eval_*.json`). The `report` command scans **all** user
+directories (the all-users view). Reports are JSON via
+`ai_speech_shadowing.core.history`; each function takes a `user_id` parameter
+(`None` = all users). See [`storage.md`](storage.md) for the full layout, the
+per-browser identity model, and the retention/cleanup configuration.
 
 | Function | Purpose |
 | --- | --- |
-| `save_report(report, *, history_dir=…)` | Write `eval_<id>.json`, return the path |
-| `list_reports(history_dir=…)` | `list[HistoryEntry]` (id, timestamp, composite score/grade) |
-| `load_report(id, history_dir=…)` | Report dict, or `None` |
-| `delete_report(id, history_dir=…)` | `True` if removed |
+| `save_report(report, *, history_dir=…, user_id=…)` | Write `eval_<id>.json`, return the path |
+| `list_reports(history_dir=…, user_id=…)` | `list[HistoryEntry]` (id, timestamp, composite score/grade) |
+| `load_report(id, history_dir=…, user_id=…)` | Report dict, or `None` |
+| `delete_report(id, history_dir=…, user_id=…)` | `True` if removed |
+| `cleanup_old_reports(history_dir=…, retention_days=…)` | Delete reports older than N days; return count |
 | `format_summary(data)` | Compact terminal view of a saved dict |
-
-This is the same store the Phase 8 `/history` REST endpoints will expose.
 
 ## Progress bars
 

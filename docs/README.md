@@ -720,6 +720,18 @@ sequenceDiagram
 
 ---
 
+## ⚙️ Environment Variables
+
+| Env var | Default | Effect | Details |
+| --- | --- | --- | --- |
+| `PHONEME_MODEL` | `slplab-l2` | Phoneme recognizer backend (`slplab-l2` / `espeak`) | [phoneme-extraction.md](phoneme-extraction.md) |
+| `HF_HOME` | HF cache default | HuggingFace model cache location | [docker.md](docker.md) |
+| `HISTORY_RETENTION_DAYS` | `7` | Delete eval reports older than this; `0` = keep forever | [storage.md](storage.md) |
+| `HISTORY_CLEANUP_INTERVAL_HOURS` | `24` | How often the background cleanup sweep runs | [storage.md](storage.md) |
+| `ENV` | _(unset)_ | `production` → cookies get `secure=True` (HTTPS-only) | [storage.md](storage.md) |
+
+---
+
 ## 📝 Design Notes & Decisions
 
 ### Why local-only?

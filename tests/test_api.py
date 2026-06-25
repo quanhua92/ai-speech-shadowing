@@ -563,3 +563,122 @@ class TestEvaluateFlow:
         health = client.get("/api/v1/health").json()
         assert health["models"]["wav2vec2"]["loaded"] is True
         assert health["models"]["tts"]["loaded"] is True
+
+
+# --------------------------------------------------------------------------- #
+# Per-user identity & history scoping (cookie flow)
+# --------------------------------------------------------------------------- #
+class TestUserIdentityCookie:
+    def test_first_visit_sets_cookie(self, client: TestClient) -> None:
+        r = client.get("/api/v1/health")
+        cookie_header = r.headers.get("set-cookie", "")
+        assert "user_id=" in cookie_header
+        assert "HttpOnly" in cookie_header
+        assert "SameSite=lax" in cookie_header
+
+    def test_same_cookie_is_reused(self, client: TestClient) -> None:
+        r1 = client.get("/api/v1/health")
+        cookie1 = r1.headers.get("set-cookie", "")
+        # second request — browser would send the cookie; TestClient stores it
+        r2 = client.get("/api/v1/health")
+        # a returning visitor should NOT get a new Set-Cookie
+        assert "user_id=" not in r2.headers.get("set-cookie", "") or cookie1 == ""
+
+    def test_two_different_cookies_see_disjoint_history(self, client: TestClient) -> None:
+        """Simulate two browsers by sending different user_id cookies."""
+        import numpy as np
+
+        from ai_speech_shadowing.core.feedback import build_report
+        from ai_speech_shadowing.core.fluency import DtwResult, FluencyDiff, PauseInfo
+        from ai_speech_shadowing.core.history import save_report
+        from ai_speech_shadowing.core.phoneme import diff_phonemes
+        from ai_speech_shadowing.core.prosody import PitchStats, ProsodyDiff
+
+        state = deps.get_state()
+        pitch = PitchStats(
+            f0_contour=np.zeros(1),
+            times=np.zeros(1),
+            mean_hz=200.0,
+            median_hz=200.0,
+            min_hz=100.0,
+            max_hz=300.0,
+            range_hz=200.0,
+            std_hz=20.0,
+            voiced_ratio=1.0,
+            pitch_floor=75.0,
+            pitch_ceiling=500.0,
+        )
+        report = build_report(
+            diff_phonemes(["a"], ["a"]),
+            ProsodyDiff(pitch, pitch, 1.0, False, 0.5, 1.0),
+            FluencyDiff(
+                DtwResult(0.0, 10, 0.0),
+                1.0,
+                PauseInfo(0, 0.0, ()),
+                PauseInfo(0, 0.0, ()),
+                2.0,
+                2.0,
+                1.0,
+            ),
+        )
+
+        # two different hashed user ids
+        uid_a = "a" * 64
+        uid_b = "b" * 64
+        save_report(report, history_dir=state.history_dir, user_id=uid_a)
+        save_report(report, history_dir=state.history_dir, user_id=uid_a)
+
+        # user A sees 2, user B sees 0
+        r_a = client.get("/api/v1/history", cookies={"user_id": uid_a})
+        assert r_a.json()["total"] == 2
+        r_b = client.get("/api/v1/history", cookies={"user_id": uid_b})
+        assert r_b.json()["total"] == 0
+
+    def test_cross_user_load_returns_404(self, client: TestClient) -> None:
+        import numpy as np
+
+        from ai_speech_shadowing.core.feedback import build_report
+        from ai_speech_shadowing.core.fluency import DtwResult, FluencyDiff, PauseInfo
+        from ai_speech_shadowing.core.history import save_report
+        from ai_speech_shadowing.core.phoneme import diff_phonemes
+        from ai_speech_shadowing.core.prosody import PitchStats, ProsodyDiff
+
+        state = deps.get_state()
+        pitch = PitchStats(
+            f0_contour=np.zeros(1),
+            times=np.zeros(1),
+            mean_hz=200.0,
+            median_hz=200.0,
+            min_hz=100.0,
+            max_hz=300.0,
+            range_hz=200.0,
+            std_hz=20.0,
+            voiced_ratio=1.0,
+            pitch_floor=75.0,
+            pitch_ceiling=500.0,
+        )
+        report = build_report(
+            diff_phonemes(["a"], ["a"]),
+            ProsodyDiff(pitch, pitch, 1.0, False, 0.5, 1.0),
+            FluencyDiff(
+                DtwResult(0.0, 10, 0.0),
+                1.0,
+                PauseInfo(0, 0.0, ()),
+                PauseInfo(0, 0.0, ()),
+                2.0,
+                2.0,
+                1.0,
+            ),
+        )
+
+        uid_a = "a" * 64
+        uid_b = "b" * 64
+        path = save_report(report, history_dir=state.history_dir, user_id=uid_a)
+        rid = path.stem
+
+        # user B tries to load user A's report → 404
+        r = client.get(f"/api/v1/history/{rid}", cookies={"user_id": uid_b})
+        assert r.status_code == 404
+        # owner can load it
+        r = client.get(f"/api/v1/history/{rid}", cookies={"user_id": uid_a})
+        assert r.status_code == 200
