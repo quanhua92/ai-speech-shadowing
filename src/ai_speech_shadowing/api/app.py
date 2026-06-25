@@ -135,6 +135,11 @@ def create_app() -> FastAPI:
         # Upload cap: reject oversized evaluation uploads up front so they are
         # never read into memory or written verbatim to disk.
         if request.url.path in _UPLOAD_PATHS:
+            # Reject chunked transfer encoding — no Content-Length to check.
+            if request.headers.get("transfer-encoding", "").lower() not in ("", "identity"):
+                return JSONResponse(
+                    status_code=413, content={"detail": "chunked transfer encoding not allowed"}
+                )
             cl = request.headers.get("content-length")
             if cl:
                 try:

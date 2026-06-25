@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
 import soundfile as sf
@@ -130,6 +130,13 @@ class AudioSample:
         except ValueError as e:
             raise AudioLoadError(f"invalid audio in {p}: {e}") from e
 
+    MAX_UNCOMPRESSED_BYTES: ClassVar[int] = 256 * 1024 * 1024
+    """Safety cap on decoded PCM size to prevent decompression bombs. 256 MB
+    covers 120 s x 192 kHz x 2 ch x 4 bytes ~ 184 MB with headroom."""
+    MAX_DECOMPRESSION_RATIO: ClassVar[int] = 50
+    """Reject if estimated decoded size / compressed size exceeds this ratio.
+    A 5 MB upload with ratio 50 caps decoded size at 250 MB."""
+
     @classmethod
     def from_bytes(cls, data: bytes) -> AudioSample:
         """Load and validate audio straight from a byte string (e.g. an upload).
@@ -141,6 +148,22 @@ class AudioSample:
 
         if not data:
             raise AudioLoadError("empty audio buffer")
+        # Estimate uncompressed size via header info before decoding.
+        try:
+            info = sf.info(io.BytesIO(data))
+        except RuntimeError as e:
+            raise AudioLoadError(f"unreadable audio header: {e}") from e
+        estimated = info.frames * (info.channels or 1) * 4
+        if estimated > cls.MAX_UNCOMPRESSED_BYTES:
+            raise AudioLoadError(
+                f"audio would decode to {estimated // (1024 * 1024)} MB, "
+                f"exceeds {cls.MAX_UNCOMPRESSED_BYTES // (1024 * 1024)} MB limit"
+            )
+        if len(data) > 0 and estimated // len(data) > cls.MAX_DECOMPRESSION_RATIO:
+            raise AudioLoadError(
+                f"decompression ratio {estimated // len(data)}x exceeds "
+                f"max {cls.MAX_DECOMPRESSION_RATIO}x"
+            )
         try:
             arr, sr = sf.read(io.BytesIO(data), dtype="float32", always_2d=False)
         except RuntimeError as e:
