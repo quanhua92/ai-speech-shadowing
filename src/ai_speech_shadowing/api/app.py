@@ -40,7 +40,7 @@ _CORS_ORIGIN_HOSTS: set[str] = {urlparse(o).netloc for o in _CORS_ORIGINS}
 # CSRF: state-changing methods a browser will send with an Origin header.
 _STATE_CHANGING: frozenset[str] = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # Hard cap on evaluation upload bodies (bounded before read into memory / disk).
-MAX_UPLOAD_BYTES: int = 25 * 1024 * 1024
+MAX_UPLOAD_BYTES: int = 5 * 1024 * 1024
 _UPLOAD_PATHS: frozenset[str] = frozenset({"/api/v1/evaluate", "/api/v1/evaluate/quick"})
 
 # History retention — env-configurable daily cleanup.
