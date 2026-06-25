@@ -20,7 +20,6 @@ from ai_speech_shadowing.api.identity import (
     USER_ID_COOKIE,
     generate_token,
     hash_token,
-    is_valid_user_id,
 )
 from ai_speech_shadowing.api.routes import demo, evaluate, health, history, reference
 from ai_speech_shadowing.core.history import cleanup_old_reports
@@ -91,11 +90,13 @@ def create_app() -> FastAPI:
         """
         raw = request.cookies.get(USER_ID_COOKIE)
         new_token: str | None = None
-        if raw and is_valid_user_id(raw):
-            # already a 64-hex digest (e.g. set by a prior version) — use directly
-            request.state.user_id = raw
-        elif raw:
-            # raw uuid token — hash for storage; keep the cookie as-is
+        if raw:
+            # Treat any non-empty cookie as a raw token (UUID4 hex) and hash
+            # it for storage.  The 64-hex digest passthrough was removed in
+            # pre-1.0 because it allowed user-id hash enumeration to produce
+            # a valid cookie (impersonation).  Old-format cookies are treated
+            # as new visitors — their orphaned history is cleaned up by the
+            # retention policy.
             request.state.user_id = hash_token(raw)
         else:
             # first visit: mint a token, hash for storage, set cookie with raw

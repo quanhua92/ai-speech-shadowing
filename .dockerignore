@@ -18,3 +18,12 @@ scripts/README.md
 # runtime user data is never baked; only data/references/ (defaults) is copied
 data/recordings
 data/history
+# secrets — these are in .gitignore but must be excluded from the build context too
+.env
+.env*
+.envrc
+.mcp.json
+opencode.json
+opencode.jsonc
+.cursor
+.vscode

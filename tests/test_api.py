@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from ai_speech_shadowing.api import deps
 from ai_speech_shadowing.api.app import create_app
+from ai_speech_shadowing.api.identity import hash_token
 from ai_speech_shadowing.core.feedback import FeedbackReport
 from ai_speech_shadowing.tts.generator import ReferenceConfig, ReferenceManager
 
@@ -622,16 +623,17 @@ class TestUserIdentityCookie:
             ),
         )
 
-        # two different hashed user ids
-        uid_a = "a" * 64
-        uid_b = "b" * 64
+        # two different raw tokens (simulating UUID4 hex cookies)
+        token_a = "a" * 32
+        token_b = "b" * 32
+        uid_a = hash_token(token_a)
         save_report(report, history_dir=state.history_dir, user_id=uid_a)
         save_report(report, history_dir=state.history_dir, user_id=uid_a)
 
         # user A sees 2, user B sees 0
-        r_a = client.get("/api/v1/history", cookies={"user_id": uid_a})
+        r_a = client.get("/api/v1/history", cookies={"user_id": token_a})
         assert r_a.json()["total"] == 2
-        r_b = client.get("/api/v1/history", cookies={"user_id": uid_b})
+        r_b = client.get("/api/v1/history", cookies={"user_id": token_b})
         assert r_b.json()["total"] == 0
 
     def test_cross_user_load_returns_404(self, client: TestClient) -> None:
@@ -671,14 +673,15 @@ class TestUserIdentityCookie:
             ),
         )
 
-        uid_a = "a" * 64
-        uid_b = "b" * 64
+        token_a = "a" * 32
+        token_b = "b" * 32
+        uid_a = hash_token(token_a)
         path = save_report(report, history_dir=state.history_dir, user_id=uid_a)
         rid = path.stem
 
         # user B tries to load user A's report → 404
-        r = client.get(f"/api/v1/history/{rid}", cookies={"user_id": uid_b})
+        r = client.get(f"/api/v1/history/{rid}", cookies={"user_id": token_b})
         assert r.status_code == 404
         # owner can load it
-        r = client.get(f"/api/v1/history/{rid}", cookies={"user_id": uid_a})
+        r = client.get(f"/api/v1/history/{rid}", cookies={"user_id": token_a})
         assert r.status_code == 200

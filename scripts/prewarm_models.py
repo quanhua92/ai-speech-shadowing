@@ -19,7 +19,13 @@ from __future__ import annotations
 
 import sys
 
-from ai_speech_shadowing.core.phoneme import MODELS
+# Hardcode model IDs so this script does NOT depend on application source.
+# This lets it run during Docker build before src/ is copied (the Dockerfile
+# runs this script between dependency install and source copy).
+MODELS: dict[str, str] = {
+    "slplab-l2": "slplab/wav2vec2-large-robust-L2-english-phoneme-recognition",
+    "espeak": "facebook/wav2vec2-lv-60-espeak-cv-ft",
+}
 
 # US + UK English voices to pre-download (each ~3 MB, one-time)
 US_VOICES = ["af_heart", "af_bella", "af_nicole", "af_sky", "am_adam", "am_michael"]
@@ -30,21 +36,20 @@ def main() -> int:
     # Prewarm every registered phoneme backend. Each loads its own processor /
     # model weights; the espeak backend additionally needs vocab.json (the G2P
     # tokenizer reads it). AutoProcessor/AutoModelForCTC cover both families.
-    import contextlib
-
     from huggingface_hub import hf_hub_download
     from kokoro import KPipeline
     from transformers import AutoModelForCTC, AutoProcessor
 
-    for key, cls in MODELS.items():
-        mid = cls.model_id
+    for key, mid in MODELS.items():
         print(f">>> prewarming phoneme model [{key}] {mid}…", flush=True)
         AutoProcessor.from_pretrained(mid)
         AutoModelForCTC.from_pretrained(mid)
         # not every backend ships a top-level vocab.json (the ARPAbet model
-        # keeps its vocab inside the tokenizer); that's fine.
-        with contextlib.suppress(Exception):
+        # keeps its vocab inside the tokenizer); silence fetch failure.
+        try:
             hf_hub_download(mid, "vocab.json")
+        except Exception:
+            print(f"    [warn] could not fetch vocab.json for {mid}", flush=True)
 
     print(">>> prewarming Kokoro TTS model + all US/UK English voices…", flush=True)
     p = KPipeline(lang_code="a")
