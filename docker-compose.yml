@@ -13,13 +13,16 @@ services:
       # Offline mode skips HuggingFace's per-file etag/HEAD validation that
       # otherwise adds ~5-6s to every cold model load.
       HF_HUB_OFFLINE: "1"
+      # Each worker loads its own ~2 GB of models (Wav2Vec2 + Kokoro); 2 workers
+      # → ~4 GB, well within the 8 GB limit below with headroom for overhead.
+      WORKERS: "2"
     volumes:
       # Named volume → persists user recordings, history, and any new references.
       # On first create Docker seeds it from the image's /app/data (the bundled
       # default references), so the demo is populated immediately.
       - app-data:/app/data
     restart: unless-stopped
-    mem_limit: 4g
+    mem_limit: 8g
     logging:
       driver: "json-file"
       options:
