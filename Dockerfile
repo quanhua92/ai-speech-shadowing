@@ -63,7 +63,15 @@ COPY --from=builder /models           /models
 COPY --from=builder /app/data/references /app/data/references
 COPY static/                          /app/static/
 
-RUN adduser --system --group --no-create-home appuser \
+# appuser needs a real, owned HOME so libraries that cache to $HOME/.cache
+# (numba/librosa's @jit cache, etc.) have a writable location. Without it they
+# try to write next to root-owned site-packages and fail ("no locator
+# available"). --home both sets the passwd field AND creates the dir; note
+# --create-home is rejected by adduser under --system, but --home works.
+# We do NOT chmod the venv: this app ingests untrusted audio, and a writable
+# package tree would let an audio-parsing RCE trojanize installed libraries,
+# undoing the non-root hardening.
+RUN adduser --system --group --home /home/appuser appuser \
     && mkdir -p /app/data/history /app/data/recordings \
     && chown -R appuser:appuser /app/data
 
