@@ -4,6 +4,7 @@ Usage:
     uv run python scripts/test_e2e.py
     uv run python scripts/test_e2e.py --host 127.0.0.1 --port 8765
     uv run python scripts/test_e2e.py --reuse        # connect to an already-running server
+    uv run python scripts/test_e2e.py --url https://localhost:8000 --insecure
 
 Flow: health → create two near-identical references (A vs B, one word changed)
 → list → download B's audio as the "user" attempt → /evaluate/quick and
@@ -48,12 +49,26 @@ def main() -> int:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--reuse", action="store_true", help="connect to an already-running server")
+    parser.add_argument(
+        "--url",
+        help="full base URL of an external server (e.g. https://host:8000); implies --reuse",
+    )
+    parser.add_argument(
+        "--insecure",
+        action="store_true",
+        help="skip TLS certificate verification (self-signed certs, e.g. scripts/serve.sh)",
+    )
     args = parser.parse_args()
 
-    base_url = f"http://{args.host}:{args.port}"
+    if args.url:
+        base_url = args.url.rstrip("/")
+        reuse = True  # external URL → always connect, never start a local server
+    else:
+        base_url = f"http://{args.host}:{args.port}"
+        reuse = args.reuse
     server_thread = None
 
-    if not args.reuse:
+    if not reuse:
         import uvicorn
 
         from ai_speech_shadowing.api.app import create_app
@@ -66,13 +81,11 @@ def main() -> int:
 
     failures: list[str] = []
 
-    with httpx.Client(base_url=base_url, timeout=TIMEOUT) as client:
+    with httpx.Client(base_url=base_url, timeout=TIMEOUT, verify=not args.insecure) as client:
         try:
             # 1. health
             health = (
-                _wait_for_health(client)
-                if not args.reuse
-                else client.get(f"{BASE_PATH}/health").json()
+                _wait_for_health(client) if not reuse else client.get(f"{BASE_PATH}/health").json()
             )
             print(f"[e2e] health: status={health['status']} version={health['version']}")
             assert health["status"] == "healthy"
