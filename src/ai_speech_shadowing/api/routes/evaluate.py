@@ -201,7 +201,7 @@ def evaluate_quick(
     state = get_state()
     lang_code = _iso_lang_to_kokoro(language)
     t0 = time.perf_counter()
-    ref_path = state.reference_manager.generate(text, lang=lang_code)
+    ref_path = state.reference_manager.generate(text, lang=lang_code, source="user")
     state.mark_tts_loaded(load_time_ms=int((time.perf_counter() - t0) * 1000))
     reference_audio = AudioSample.from_wav(ref_path)
     user_audio, attempt_bytes = _decode_upload(audio)

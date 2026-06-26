@@ -62,7 +62,7 @@ def create_reference(req: ReferenceCreateRequest) -> ReferenceResponse:
         state.reference_manager.config.default_voice if req.speaker == "default" else req.speaker
     )
     t0 = time.perf_counter()
-    state.reference_manager.generate(req.text, voice=voice, lang=lang_code)
+    state.reference_manager.generate(req.text, voice=voice, lang=lang_code, source="user")
     state.mark_tts_loaded(load_time_ms=int((time.perf_counter() - t0) * 1000))
     return _build_response(slugify(req.text))
 

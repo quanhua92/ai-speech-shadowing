@@ -111,6 +111,8 @@ def cleanup_old_reports(history_dir, retention_days=7) -> int:
 | --- | --- | --- |
 | `HISTORY_RETENTION_DAYS` | `7` | Reports older than this are deleted (JSON + WAV). `0` = keep forever |
 | `HISTORY_CLEANUP_INTERVAL_HOURS` | `24` | How often the background sweep runs |
+| `REFERENCES_RETENTION_HOURS` | `1` | User-generated references (`source="user"`) older than this are deleted. `0` = keep forever. See [tts-reference.md](tts-reference.md#retention) |
+| `REFERENCES_CLEANUP_INTERVAL_HOURS` | `1` | How often the reference cleanup sweep runs |
 | `ENV` | _(unset)_ | `production` → cookies get `secure=True` (HTTPS-only) |
 | `PHONEME_MODEL` | `slplab-l2` | Phoneme backend (see [phoneme-extraction.md](phoneme-extraction.md)) |
 

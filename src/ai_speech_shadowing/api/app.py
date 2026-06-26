@@ -23,7 +23,7 @@ from ai_speech_shadowing.api.identity import (
 )
 from ai_speech_shadowing.api.routes import demo, evaluate, health, history, reference
 from ai_speech_shadowing.core.history import cleanup_old_reports
-from ai_speech_shadowing.tts.generator import PathEscapeError
+from ai_speech_shadowing.tts.generator import PathEscapeError, cleanup_old_references
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,28 @@ def _cleanup_interval_seconds() -> float:
         hours = int(os.environ.get("HISTORY_CLEANUP_INTERVAL_HOURS", "24"))
     except ValueError:
         hours = 24
+    return max(1.0, hours * 3600.0)
+
+
+# Reference retention — user-generated references (source="user") are swept
+# hourly by default; seed references are never touched (see cleanup_old_references).
+DEFAULT_REFERENCE_RETENTION_HOURS: int = 1
+
+
+def _reference_retention_hours() -> int:
+    try:
+        return int(
+            os.environ.get("REFERENCES_RETENTION_HOURS", str(DEFAULT_REFERENCE_RETENTION_HOURS))
+        )
+    except ValueError:
+        return DEFAULT_REFERENCE_RETENTION_HOURS
+
+
+def _reference_cleanup_interval_seconds() -> float:
+    try:
+        hours = int(os.environ.get("REFERENCES_CLEANUP_INTERVAL_HOURS", "1"))
+    except ValueError:
+        hours = 1
     return max(1.0, hours * 3600.0)
 
 
@@ -167,14 +189,18 @@ def create_app() -> FastAPI:
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Startup/shutdown hook. Models stay lazy; the cleanup task runs daily."""
-    cleanup_task = asyncio.create_task(_periodic_cleanup())
+    """Startup/shutdown hook. Models stay lazy; cleanup tasks run periodically."""
+    history_task = asyncio.create_task(_periodic_cleanup())
+    reference_task = asyncio.create_task(_periodic_reference_cleanup())
     try:
         yield
     finally:
-        cleanup_task.cancel()
+        history_task.cancel()
+        reference_task.cancel()
         with suppress(asyncio.CancelledError):
-            await cleanup_task
+            await history_task
+        with suppress(asyncio.CancelledError):
+            await reference_task
 
 
 async def _periodic_cleanup() -> None:
@@ -189,6 +215,28 @@ async def _periodic_cleanup() -> None:
                 logger.info("periodic cleanup removed %d report(s)", deleted)
         except Exception:
             logger.exception("history cleanup task failed")
+        await asyncio.sleep(interval)
+
+
+async def _periodic_reference_cleanup() -> None:
+    """Delete aged-out user references at startup, then every interval.
+
+    Only ``source="user"`` references are eligible — seed references are
+    preserved by cleanup_old_references itself.
+    """
+    interval = _reference_cleanup_interval_seconds()
+    # stagger off both startup and the history sweep
+    await asyncio.sleep(15)
+    while True:
+        try:
+            deleted = cleanup_old_references(
+                get_state().reference_manager.config.base_dir,
+                _reference_retention_hours(),
+            )
+            if deleted:
+                logger.info("periodic cleanup removed %d user reference(s)", deleted)
+        except Exception:
+            logger.exception("reference cleanup task failed")
         await asyncio.sleep(interval)
 
 

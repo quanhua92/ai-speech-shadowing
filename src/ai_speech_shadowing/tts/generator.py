@@ -24,13 +24,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
+import shutil
 import threading
 import unicodedata
 from contextlib import suppress
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -43,6 +45,8 @@ from ai_speech_shadowing.core.g2p import misaki_to_espeak_tokens
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
+
+logger = logging.getLogger(__name__)
 
 # Process-wide KPipeline cache: keyed by lang_code, loaded at most once per
 # process. "lang" is a single-letter Kokoro language code ("a" for en-us, etc.).
@@ -236,6 +240,7 @@ class ReferenceManager:
         lang: str,
         voice: str,
         phonemes: Sequence[str] | None = None,
+        source: str = "seed",
     ) -> Path:
         """Merge this voice profile into ``<slug>/metadata.json`` (create if absent).
 
@@ -243,6 +248,11 @@ class ReferenceManager:
         generation wins, since the canonical G2P pronunciation is a function of
         the text, not the voice. Re-running with a different voice for the same
         text therefore leaves the cached phonemes untouched.
+
+        ``source`` records who created the reference (``"seed"`` for the
+        pre-generated bundle, ``"user"`` for API-created ones) and likewise
+        settles on first write — adding a voice to an existing slug never
+        rewrites its origin.
         """
         path = self.metadata_path(slug)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -256,6 +266,7 @@ class ReferenceManager:
                     data = json.loads(path.read_text(encoding="utf-8"))
                 except (json.JSONDecodeError, OSError):
                     data = {}  # treat a corrupt file as empty rather than crashing
+            data.setdefault("source", source)
             data.setdefault("text", text)
             data.setdefault("language", KOKORO_LANGUAGES.get(lang, lang))
             data.setdefault("default_speaker", voice)
@@ -358,11 +369,13 @@ class ReferenceManager:
         voice: str | None = None,
         lang: str | None = None,
         force: bool = False,
+        source: str = "seed",
     ) -> Path:
         """Synthesize ``text`` with Kokoro and write it under the slug folder.
 
         Cached: returns the existing path if the WAV already exists and
-        ``force`` is False.
+        ``force`` is False. ``source`` is forwarded to :meth:`write_metadata`
+        so callers can tag the reference's origin (default ``"seed"``).
         """
         import soundfile as sf
 
@@ -399,7 +412,7 @@ class ReferenceManager:
             with suppress(OSError):
                 out.parent.rmdir()  # only succeeds if empty
             raise
-        self.write_metadata(slug, text, lang, voice, phonemes=phoneme_tokens or None)
+        self.write_metadata(slug, text, lang, voice, phonemes=phoneme_tokens or None, source=source)
         return out
 
     def generate_batch(
@@ -414,3 +427,67 @@ class ReferenceManager:
         return [
             self.generate(s, voice=voice, lang=lang, force=force) for s in sentences if s.strip()
         ]
+
+
+# --------------------------------------------------------------------------- #
+# Retention — delete user-generated references older than N hours
+# --------------------------------------------------------------------------- #
+def _parse_timestamp(raw: str) -> datetime | None:
+    if not raw:
+        return None
+    try:
+        ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=UTC)
+    return ts
+
+
+def cleanup_old_references(
+    base_dir: str | Path = DEFAULT_BASE_DIR,
+    retention_hours: int = 1,
+) -> int:
+    """Delete user-generated references (``source == "user"``) whose
+    ``updated_at`` is older than ``retention_hours``. Returns the count removed.
+
+    Pre-generated seed references — those with no ``source`` field or any value
+    other than ``"user"`` — are never removed. This protects the hundreds of
+    bundled references without requiring a migration: existing on-disk metadata
+    predates the field and defaults to ``"seed"``.
+
+    ``retention_hours <= 0`` is a no-op (keep forever). Corrupt or missing
+    metadata is skipped, never deleted blindly.
+    """
+    if retention_hours <= 0:
+        return 0
+    base = Path(base_dir)
+    if not base.is_dir():
+        return 0
+    cutoff = datetime.now(UTC) - timedelta(hours=retention_hours)
+    deleted = 0
+    for entry in sorted(base.iterdir()):
+        if not entry.is_dir():
+            continue
+        meta_path = entry / "metadata.json"
+        if not meta_path.is_file():
+            continue
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue  # corrupt metadata -> leave it alone
+        if str(meta.get("source", "seed")) != "user":
+            continue
+        updated = _parse_timestamp(str(meta.get("updated_at", "")))
+        if updated is None or updated >= cutoff:
+            continue
+        with suppress(OSError):
+            shutil.rmtree(entry)
+        deleted += 1
+    if deleted:
+        logger.info(
+            "reference cleanup: deleted %d user reference(s) older than %d hour(s)",
+            deleted,
+            retention_hours,
+        )
+    return deleted
