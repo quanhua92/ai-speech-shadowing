@@ -631,10 +631,24 @@ def serve_cmd(
     ] = None,
 ) -> None:
     """Serve the REST API (FastAPI + uvicorn) at /api/v1."""
+    import copy
+
     import uvicorn
+    from uvicorn.config import LOGGING_CONFIG as _UVICORN_LOG_CONFIG
 
     scheme = "https" if ssl_certfile else "http"
     typer.echo(f"Serving API on {scheme}://{host}:{port}/api/v1  (docs at /docs)")
+
+    # Uvicorn's default LOGGING_CONFIG only wires up the three ``uvicorn.*``
+    # loggers and leaves the ROOT logger at WARNING with no handler, so app
+    # ``logger.info()`` calls are silently dropped — and with ``workers>1``
+    # each worker is a spawned process that never re-runs basicConfig. A custom
+    # dictConfig passed via ``log_config`` is applied by uvicorn inside EVERY
+    # worker (Config.configure_logging), so adding a ``root`` entry here makes
+    # application logs visible across all workers.
+    log_config = copy.deepcopy(_UVICORN_LOG_CONFIG)
+    log_config["root"] = {"level": "INFO", "handlers": ["default"]}
+
     extra: dict[str, object] = {}
     if not reload:
         extra["workers"] = max(2, os.cpu_count() or 2)
@@ -645,5 +659,6 @@ def serve_cmd(
         reload=reload,
         ssl_certfile=str(ssl_certfile) if ssl_certfile else None,
         ssl_keyfile=str(ssl_keyfile) if ssl_keyfile else None,
+        log_config=log_config,
         **extra,
     )

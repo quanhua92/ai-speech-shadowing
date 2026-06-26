@@ -7,6 +7,7 @@ process.
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from dataclasses import dataclass, field
@@ -14,6 +15,8 @@ from pathlib import Path
 
 from ai_speech_shadowing.core.phoneme import PhonemeExtractor, get_extractor
 from ai_speech_shadowing.tts.generator import ReferenceConfig, ReferenceManager
+
+logger = logging.getLogger(__name__)
 
 _EXTRACTOR_RETRY_COOLDOWN: float = 30.0
 """Seconds to wait before retrying a failed extractor load."""
@@ -61,12 +64,17 @@ class EngineState:
             else:
                 t0 = time.perf_counter()
                 try:
+                    logger.info("[load] deps: requesting phoneme_extractor (first load)...")
                     self._extractor = get_extractor()
                 except Exception as exc:
                     self._extractor_error_ts = time.monotonic()
                     self._extractor_error = exc
                     raise
                 self.extractor_load_time_ms = int((time.perf_counter() - t0) * 1000)
+                logger.info(
+                    "[load] deps: phoneme_extractor ready in %sms",
+                    self.extractor_load_time_ms,
+                )
         return self._extractor
 
     def mark_tts_loaded(self, *, load_time_ms: int) -> None:

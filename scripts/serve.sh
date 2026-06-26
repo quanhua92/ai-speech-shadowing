@@ -53,6 +53,37 @@ if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
   chmod 644 "$CERT"
 fi
 
+# ── Pre-flight model cache check ────────────────────────────────────────────
+# Run fully offline when the models are already cached: this skips HuggingFace's
+# per-file etag/HEAD validation, which otherwise adds ~5-6s to every cold model
+# load (paid once per worker). If anything is missing, prewarm once in the
+# foreground — the SAME script the Docker build uses (scripts/prewarm_models.py)
+# — then go offline. A background download would race the offline-mode server
+# and fail the first request, so it stays synchronous.
+HF_CACHE="${HF_HOME:-$HOME/.cache/huggingface}"
+REQUIRED_MODELS=(
+  "models--slplab--wav2vec2-large-robust-L2-english-phoneme-recognition"
+  "models--facebook--wav2vec2-lv-60-espeak-cv-ft"
+  "models--hexgrad--Kokoro-82M"
+)
+_models_cached() {
+  for m in "${REQUIRED_MODELS[@]}"; do
+    ls -d "$HF_CACHE/hub/$m/snapshots"/*/ >/dev/null 2>&1 || return 1
+  done
+}
+if [ -n "${HF_HUB_OFFLINE:-}" ]; then
+  echo "HF_HUB_OFFLINE already set (${HF_HUB_OFFLINE}); respecting it."
+elif _models_cached; then
+  export HF_HUB_OFFLINE=1
+  echo "Models cached in ${HF_CACHE} -> HF_HUB_OFFLINE=1 (offline, fast cold loads)."
+else
+  echo "Some models missing in ${HF_CACHE}; prewarming (one-time download)..."
+  uv run python scripts/prewarm_models.py
+  export HF_HUB_OFFLINE=1
+  echo "Prewarm done -> HF_HUB_OFFLINE=1."
+fi
+# ────────────────────────────────────────────────────────────────────────────
+
 # MPS fallback only applies on macOS; harmless but unnecessary on Linux.
 # export PYTORCH_ENABLE_MPS_FALLBACK=1
 LOG="/tmp/ai-speech-shadowing-${PORT}.log"

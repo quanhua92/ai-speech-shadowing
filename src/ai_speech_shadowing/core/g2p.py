@@ -46,10 +46,16 @@ def _get_espeak_tokens(model_id: str = ESPEAK_MODEL_ID) -> list[str]:
     global _espeak_tokens
     if _espeak_tokens is None:
         import json
+        import logging
+        import time
 
         from huggingface_hub import hf_hub_download
 
+        log = logging.getLogger(__name__)
+        t0 = time.perf_counter()
         vocab = json.loads(Path(hf_hub_download(model_id, "vocab.json")).read_text("utf-8"))
+        elapsed = time.perf_counter() - t0
+        log.info("[load] g2p espeak vocab.json fetch (%s) = %.2fs", model_id, elapsed)
         _espeak_tokens = sorted((t for t in vocab if not t.startswith("<")), key=len, reverse=True)
     return _espeak_tokens
 

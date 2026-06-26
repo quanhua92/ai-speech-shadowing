@@ -8,6 +8,11 @@ services:
       - "8000:8000"
     environment:
       HF_HOME: /models
+      # Models are baked into /models at image build time (Dockerfile runs
+      # scripts/prewarm_models.py), so they are always present at runtime.
+      # Offline mode skips HuggingFace's per-file etag/HEAD validation that
+      # otherwise adds ~5-6s to every cold model load.
+      HF_HUB_OFFLINE: "1"
     volumes:
       # Named volume → persists user recordings, history, and any new references.
       # On first create Docker seeds it from the image's /app/data (the bundled

@@ -31,6 +31,8 @@ from __future__ import annotations
 # ruff: noqa: RUF001, RUF002, RUF003
 import difflib
 import json
+import logging
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +41,8 @@ from typing import TYPE_CHECKING, ClassVar
 import numpy as np
 
 from ai_speech_shadowing.core.audio import TARGET_SAMPLE_RATE, AudioSample
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -412,13 +416,19 @@ class EspeakPhonemeModel(PhonemeModel):
         from huggingface_hub import hf_hub_download
         from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2ForCTC
 
+        t0 = time.perf_counter()
         self._feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(self.model_id)
+        logger.info("[load] espeak feature_extractor = %.2fs", time.perf_counter() - t0)
+        t1 = time.perf_counter()
         self._model = Wav2Vec2ForCTC.from_pretrained(self.model_id).to(self.device).eval()
+        logger.info("[load] espeak model weights = %.2fs", time.perf_counter() - t1)
 
+        t2 = time.perf_counter()
         vocab_path = hf_hub_download(self.model_id, "vocab.json")
         vocab = json.loads(Path(vocab_path).read_text(encoding="utf-8"))
         self._id2token: dict[int, str] = {int(idx): tok for tok, idx in vocab.items()}
         self._blank_id: int = int(vocab.get(BLANK_TOKEN, 0))
+        logger.info("[load] espeak vocab.json = %.2fs", time.perf_counter() - t2)
 
     def _normalize(self, raw: tuple[str, ...], language: str | None) -> tuple[str, ...]:
         return _strip_tones_marks(raw, language)
@@ -443,8 +453,12 @@ class ArpabetPhonemeModel(PhonemeModel):
     def _load(self) -> None:
         from transformers import AutoModelForCTC, AutoProcessor
 
+        t0 = time.perf_counter()
         self._feature_extractor = AutoProcessor.from_pretrained(self.model_id)
+        logger.info("[load] slplab AutoProcessor = %.2fs", time.perf_counter() - t0)
+        t1 = time.perf_counter()
         self._model = AutoModelForCTC.from_pretrained(self.model_id).to(self.device).eval()
+        logger.info("[load] slplab model weights = %.2fs", time.perf_counter() - t1)
 
         vocab = self._feature_extractor.tokenizer.get_vocab()
         self._id2token: dict[int, str] = {int(idx): tok for tok, idx in vocab.items()}
@@ -495,8 +509,13 @@ def get_phoneme_model(
         cls = MODELS.get(key)
         if cls is None:
             raise ValueError(f"unknown phoneme model {key!r}; available: {sorted(MODELS)}")
+        logger.info("[load] get_phoneme_model: constructing %s (%s)", key, cls.__name__)
+        t0 = time.perf_counter()
         _model_instance = cls(device=device)
+        logger.info("[load] get_phoneme_model: %s total = %.2fs", key, time.perf_counter() - t0)
         _model_instance_key = key
+    else:
+        logger.info("[load] get_phoneme_model: cache hit (%s)", _model_instance_key)
     return _model_instance
 
 

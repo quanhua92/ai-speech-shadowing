@@ -33,6 +33,27 @@ user recordings, history, and any newly-generated references persist across
 restarts. The model cache (`/models`) is **baked in, not a volume** — that's
 what makes `up` work offline instantly.
 
+## Offline mode (`HF_HUB_OFFLINE=1`)
+
+Because every model is baked into `/models` at **build time**
+(`scripts/prewarm_models.py` runs during `docker build`), the container sets
+`HF_HUB_OFFLINE=1` in `docker-compose.yml`. This tells `huggingface_hub` /
+`transformers` to use only the local cache and **skip the per-file etag/HEAD
+validation** against `huggingface.co` that `from_pretrained` performs even when
+files are fully cached. That validation otherwise costs **~5-6 s per cold model
+load** (paid once per worker); offline mode drops it to ~0.01 s.
+
+| Path | Offline behaviour |
+| --- | --- |
+| **Docker** | `HF_HUB_OFFLINE=1` is set in `docker-compose.yml` — always safe, models are baked. |
+| **`scripts/serve.sh`** (local dev) | A pre-flight checks `$HF_HOME` (default `~/.cache/huggingface`) for the 3 required models. If all present → enables offline. If any missing → runs `scripts/prewarm_models.py` **once in the foreground** (same as the build), then enables offline. |
+
+> Offline mode fails fast ("file not found in cached path") if a model isn't
+> cached — so `serve.sh` prewarms *before* going offline rather than downloading
+> in the background (a background download would race the offline-mode server
+> and fail the first request). To force a re-download locally, clear the cache
+> dir and re-run `serve.sh`, or `unset HF_HUB_OFFLINE` for a one-off online run.
+
 ## Faster local builds (pre-warm the model cache)
 
 The models are almost certainly already in your HuggingFace cache if you've run
